@@ -1,0 +1,21 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+nav {
+    padding: 1rem;
+}
+
+main {
+    padding: 2rem;
+}
+
+footer {
+    padding: 1rem;
+    text-align: center;
+}
