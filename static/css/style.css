@@ -129,6 +129,15 @@ footer {
     gap: 1rem;
 }
 
+.weather-card h3 {
+    margin-top: 0;
+    font-size: 1.5rem;
+}
+
+.weather-card p {
+    margin: 0.75rem 0;
+}
+
 @media (max-width: 768px) {
     main {
         padding: 1rem;

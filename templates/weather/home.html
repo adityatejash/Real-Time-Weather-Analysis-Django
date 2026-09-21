@@ -44,27 +44,60 @@ Weather Dashboard
     <section class="dashboard-section">
         <h2>Current Weather</h2>
 
-        <div class="weather-card">
+        {% if weather %}
 
-            {% if weather %}
+            <div class="weather-card">
 
                 <h3>
                     {{ weather.city }}, {{ weather.country }}
                 </h3>
 
                 <p>
-                    Weather information will be displayed here.
+                    <strong>Temperature:</strong>
+                    {{ weather.temperature }}°C
                 </p>
 
-            {% else %}
+                <p>
+                    <strong>Feels Like:</strong>
+                    {{ weather.feels_like }}°C
+                </p>
 
+                <p>
+                    <strong>Conditions:</strong>
+                    {{ weather.description }}
+                </p>
+
+                <p>
+                    <strong>Humidity:</strong>
+                    {{ weather.humidity }}%
+                </p>
+
+                <p>
+                    <strong>Pressure:</strong>
+                    {{ weather.pressure }} hPa
+                </p>
+
+                <p>
+                    <strong>Wind Speed:</strong>
+                    {{ weather.wind_speed }} m/s
+                </p>
+
+                <p>
+                    <strong>Cloudiness:</strong>
+                    {{ weather.clouds }}%
+                </p>
+
+            </div>
+
+        {% else %}
+
+            <div class="weather-card">
                 <p>
                     Search for a city to view current weather.
                 </p>
+            </div>
 
-            {% endif %}
-
-        </div>
+        {% endif %}
     </section>
 
 
@@ -80,7 +113,7 @@ Weather Dashboard
     </section>
 
 
-    <!-- Analysis -->
+    <!-- Weather Analysis -->
     <section class="dashboard-section">
         <h2>Weather Analysis</h2>
 
@@ -88,17 +121,28 @@ Weather Dashboard
 
             <div class="dashboard-card">
                 <h3>Statistics</h3>
-                <p>Weather statistics will be displayed here.</p>
+
+                <p>
+                    Weather statistics will be displayed here.
+                </p>
             </div>
+
 
             <div class="dashboard-card">
                 <h3>Temperature Trends</h3>
-                <p>Temperature analysis will be displayed here.</p>
+
+                <p>
+                    Temperature analysis will be displayed here.
+                </p>
             </div>
+
 
             <div class="dashboard-card">
                 <h3>Humidity Trends</h3>
-                <p>Humidity analysis will be displayed here.</p>
+
+                <p>
+                    Humidity analysis will be displayed here.
+                </p>
             </div>
 
         </div>
@@ -127,6 +171,11 @@ Weather Dashboard
                         </p>
 
                         <p>
+                            Humidity: {{ item.humidity }}% |
+                            Wind: {{ item.wind_speed }} m/s
+                        </p>
+
+                        <p>
                             Searched at: {{ item.searched_at }}
                         </p>
 
@@ -138,7 +187,9 @@ Weather Dashboard
 
         {% else %}
 
-            <p>No weather searches yet.</p>
+            <p>
+                No weather searches yet.
+            </p>
 
         {% endif %}
 
