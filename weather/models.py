@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 
 class WeatherData(models.Model):
-    city = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, db_index=True)
     country = models.CharField(max_length=2)
     temperature = models.FloatField()
     feels_like = models.FloatField()
@@ -12,7 +12,10 @@ class WeatherData(models.Model):
     description = models.CharField(max_length=255)
     wind_speed = models.FloatField()
     clouds = models.IntegerField()
-    searched_at = models.DateTimeField(auto_now_add=True)
+    searched_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-searched_at"]
 
     def __str__(self):
         return f"{self.city}, {self.country}"
