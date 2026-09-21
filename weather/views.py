@@ -35,7 +35,7 @@ def home(request):
                     clouds=weather["clouds"],
                 )
 
-    history = WeatherData.objects.order_by("-searched_at")
+    history = WeatherData.objects.all()
 
     latest_searches = history[:10]
 
@@ -46,7 +46,7 @@ def home(request):
     if searched_city:
         city_weather = WeatherData.objects.filter(
             city__iexact=searched_city
-        ).order_by("-searched_at")
+        )
 
     return render(
         request,
