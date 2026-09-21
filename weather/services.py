@@ -22,3 +22,17 @@ def get_weather_data(city):
     response.raise_for_status()
 
     return response.json()
+
+
+def parse_weather_data(data):
+    return {
+        "city": data["name"],
+        "country": data["sys"]["country"],
+        "temperature": data["main"]["temp"],
+        "feels_like": data["main"]["feels_like"],
+        "humidity": data["main"]["humidity"],
+        "pressure": data["main"]["pressure"],
+        "description": data["weather"][0]["description"],
+        "wind_speed": data["wind"]["speed"],
+        "clouds": data["clouds"]["all"],
+    }
