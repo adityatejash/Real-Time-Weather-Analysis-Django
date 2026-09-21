@@ -8,17 +8,16 @@ Weather Analysis
 
 <section>
     <h1>Real-Time Weather Analysis</h1>
-    <p>Check current weather conditions and analyze weather data.</p>
+
+    <p>
+        Check current weather conditions and analyze weather data.
+    </p>
 
     <div>
         <h2>Search for a City</h2>
 
-        <form>
-            <input
-                type="text"
-                name="city"
-                placeholder="Enter city name"
-            >
+        <form method="get">
+            {{ form.as_p }}
 
             <button type="submit">
                 Search

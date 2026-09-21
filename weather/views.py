@@ -1,5 +1,13 @@
 from django.shortcuts import render
 
+from .forms import CitySearchForm
+
 
 def home(request):
-    return render(request, "weather/home.html")
+    form = CitySearchForm()
+
+    return render(
+        request,
+        "weather/home.html",
+        {"form": form},
+    )
