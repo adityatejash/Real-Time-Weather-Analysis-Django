@@ -24,8 +24,7 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-pre=oce6t5xm)#28bz3c#)=4ytn$)^+)tl*(9-n18c)px7*y#e'
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
