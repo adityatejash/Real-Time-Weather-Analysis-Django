@@ -37,7 +37,7 @@ def home(request):
 
     history = WeatherData.objects.order_by("-searched_at")
 
-    latest_searches = WeatherData.objects.order_by("-searched_at")[:10]
+    latest_searches = history[:10]
 
     city_weather = None
 
