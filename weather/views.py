@@ -1,6 +1,7 @@
 from django.shortcuts import render
 
 from .forms import CitySearchForm
+from .models import WeatherData
 from .services import get_weather_data, parse_weather_data
 
 
@@ -21,6 +22,18 @@ def home(request):
                 error = data["error"]
             else:
                 weather = parse_weather_data(data)
+
+                WeatherData.objects.create(
+                    city=weather["city"],
+                    country=weather["country"],
+                    temperature=weather["temperature"],
+                    feels_like=weather["feels_like"],
+                    humidity=weather["humidity"],
+                    pressure=weather["pressure"],
+                    description=weather["description"],
+                    wind_speed=weather["wind_speed"],
+                    clouds=weather["clouds"],
+                )
 
     return render(
         request,
