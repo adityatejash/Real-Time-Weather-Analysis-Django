@@ -41,9 +41,11 @@ def home(request):
 
     city_weather = None
 
-    if request.GET.get("city"):
+    searched_city = request.GET.get("city")
+
+    if searched_city:
         city_weather = WeatherData.objects.filter(
-            city__iexact=request.GET.get("city")
+            city__iexact=searched_city
         ).order_by("-searched_at")
 
     return render(
