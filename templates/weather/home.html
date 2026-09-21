@@ -65,6 +65,36 @@ Weather Analysis
         </section>
     {% endif %}
 
+    {% if history %}
+    <section>
+        <h2>Search History</h2>
+
+        {% for item in history %}
+            <div>
+                <p>
+                    <strong>
+                        {{ item.city }}, {{ item.country }}
+                    </strong>
+                </p>
+
+                <p>
+                    {{ item.temperature }}°C |
+                    {{ item.description }}
+                </p>
+
+                <p>
+                    Humidity: {{ item.humidity }}% |
+                    Wind: {{ item.wind_speed }} m/s
+                </p>
+
+                <p>
+                    Searched at: {{ item.searched_at }}
+                </p>
+            </div>
+        {% endfor %}
+    </section>
+{% endif %}
+
 </section>
 
 {% endblock %}

@@ -35,6 +35,8 @@ def home(request):
                     clouds=weather["clouds"],
                 )
 
+    history = WeatherData.objects.order_by("-searched_at")
+
     return render(
         request,
         "weather/home.html",
@@ -42,5 +44,6 @@ def home(request):
             "form": form,
             "weather": weather,
             "error": error,
+            "history": history,
         },
     )
