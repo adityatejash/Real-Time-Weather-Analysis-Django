@@ -138,6 +138,43 @@ footer {
     margin: 0.75rem 0;
 }
 
+.weather-location {
+    margin-bottom: 1.5rem;
+}
+
+.weather-location h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+}
+
+.weather-location p {
+    margin: 0;
+    text-transform: capitalize;
+}
+
+.weather-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.metric-card {
+    padding: 1.25rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.metric-card h4 {
+    margin: 0 0 0.75rem;
+}
+
+.metric-card p {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
 @media (max-width: 768px) {
     main {
         padding: 1rem;
@@ -148,7 +185,8 @@ footer {
         align-items: stretch;
     }
 
-    .analysis-grid {
+    .analysis-grid,
+    .weather-metrics {
         grid-template-columns: 1fr;
     }
 }
