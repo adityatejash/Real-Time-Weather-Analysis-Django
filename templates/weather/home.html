@@ -24,6 +24,41 @@ Weather Analysis
             </button>
         </form>
     </div>
+
+    {% if weather %}
+        <section>
+            <h2>{{ weather.city }}, {{ weather.country }}</h2>
+
+            <p>
+                Temperature: {{ weather.temperature }}°C
+            </p>
+
+            <p>
+                Feels Like: {{ weather.feels_like }}°C
+            </p>
+
+            <p>
+                Humidity: {{ weather.humidity }}%
+            </p>
+
+            <p>
+                Pressure: {{ weather.pressure }} hPa
+            </p>
+
+            <p>
+                Conditions: {{ weather.description }}
+            </p>
+
+            <p>
+                Wind Speed: {{ weather.wind_speed }} m/s
+            </p>
+
+            <p>
+                Cloudiness: {{ weather.clouds }}%
+            </p>
+        </section>
+    {% endif %}
+
 </section>
 
 {% endblock %}
