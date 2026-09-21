@@ -7,6 +7,7 @@ from .services import get_weather_data, parse_weather_data
 def home(request):
     form = CitySearchForm()
     weather = None
+    error = None
 
     if request.method == "GET" and request.GET.get("city"):
         form = CitySearchForm(request.GET)
@@ -15,7 +16,11 @@ def home(request):
             city = form.cleaned_data["city"]
 
             data = get_weather_data(city)
-            weather = parse_weather_data(data)
+
+            if "error" in data:
+                error = data["error"]
+            else:
+                weather = parse_weather_data(data)
 
     return render(
         request,
@@ -23,5 +28,6 @@ def home(request):
         {
             "form": form,
             "weather": weather,
+            "error": error,
         },
     )

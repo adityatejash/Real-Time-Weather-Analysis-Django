@@ -25,6 +25,12 @@ Weather Analysis
         </form>
     </div>
 
+    {% if error %}
+        <div>
+            <p>{{ error }}</p>
+        </div>
+    {% endif %}
+
     {% if weather %}
         <section>
             <h2>{{ weather.city }}, {{ weather.country }}</h2>
