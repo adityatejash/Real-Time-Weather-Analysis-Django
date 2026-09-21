@@ -13,15 +13,31 @@ def get_weather_data(city):
         "units": "metric",
     }
 
-    response = requests.get(
-        BASE_URL,
-        params=params,
-        timeout=10,
-    )
+    try:
+        response = requests.get(
+            BASE_URL,
+            params=params,
+            timeout=10,
+        )
 
-    response.raise_for_status()
+        if response.status_code == 404:
+            return {
+                "error": "City not found."
+            }
 
-    return response.json()
+        response.raise_for_status()
+
+        return response.json()
+
+    except requests.exceptions.Timeout:
+        return {
+            "error": "Weather service request timed out."
+        }
+
+    except requests.exceptions.RequestException:
+        return {
+            "error": "Unable to connect to the weather service."
+        }
 
 
 def parse_weather_data(data):

@@ -25,6 +25,12 @@ Weather Analysis
         </form>
     </div>
 
+    {% if error %}
+        <div>
+            <p>{{ error }}</p>
+        </div>
+    {% endif %}
+
     {% if weather %}
         <section>
             <h2>{{ weather.city }}, {{ weather.country }}</h2>
@@ -58,6 +64,36 @@ Weather Analysis
             </p>
         </section>
     {% endif %}
+
+    {% if history %}
+    <section>
+        <h2>Search History</h2>
+
+        {% for item in history %}
+            <div>
+                <p>
+                    <strong>
+                        {{ item.city }}, {{ item.country }}
+                    </strong>
+                </p>
+
+                <p>
+                    {{ item.temperature }}°C |
+                    {{ item.description }}
+                </p>
+
+                <p>
+                    Humidity: {{ item.humidity }}% |
+                    Wind: {{ item.wind_speed }} m/s
+                </p>
+
+                <p>
+                    Searched at: {{ item.searched_at }}
+                </p>
+            </div>
+        {% endfor %}
+    </section>
+{% endif %}
 
 </section>
 
