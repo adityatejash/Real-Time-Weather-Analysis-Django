@@ -48,44 +48,55 @@ Weather Dashboard
 
             <div class="weather-card">
 
-                <h3>
-                    {{ weather.city }}, {{ weather.country }}
-                </h3>
+                <div class="weather-location">
+                    <h3>
+                        {{ weather.city }}, {{ weather.country }}
+                    </h3>
 
-                <p>
-                    <strong>Temperature:</strong>
-                    {{ weather.temperature }}°C
-                </p>
+                    <p>
+                        {{ weather.description|title }}
+                    </p>
+                </div>
 
-                <p>
-                    <strong>Feels Like:</strong>
-                    {{ weather.feels_like }}°C
-                </p>
 
-                <p>
-                    <strong>Conditions:</strong>
-                    {{ weather.description }}
-                </p>
+                <div class="weather-metrics">
 
-                <p>
-                    <strong>Humidity:</strong>
-                    {{ weather.humidity }}%
-                </p>
+                    <div class="metric-card">
+                        <h4>Temperature</h4>
+                        <p>{{ weather.temperature }}°C</p>
+                    </div>
 
-                <p>
-                    <strong>Pressure:</strong>
-                    {{ weather.pressure }} hPa
-                </p>
 
-                <p>
-                    <strong>Wind Speed:</strong>
-                    {{ weather.wind_speed }} m/s
-                </p>
+                    <div class="metric-card">
+                        <h4>Feels Like</h4>
+                        <p>{{ weather.feels_like }}°C</p>
+                    </div>
 
-                <p>
-                    <strong>Cloudiness:</strong>
-                    {{ weather.clouds }}%
-                </p>
+
+                    <div class="metric-card">
+                        <h4>Humidity</h4>
+                        <p>{{ weather.humidity }}%</p>
+                    </div>
+
+
+                    <div class="metric-card">
+                        <h4>Pressure</h4>
+                        <p>{{ weather.pressure }} hPa</p>
+                    </div>
+
+
+                    <div class="metric-card">
+                        <h4>Wind Speed</h4>
+                        <p>{{ weather.wind_speed }} m/s</p>
+                    </div>
+
+
+                    <div class="metric-card">
+                        <h4>Cloudiness</h4>
+                        <p>{{ weather.clouds }}%</p>
+                    </div>
+
+                </div>
 
             </div>
 
