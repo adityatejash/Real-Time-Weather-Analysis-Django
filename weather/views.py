@@ -10,6 +10,7 @@ def home(request):
     weather = None
     error = None
     forecast = None
+    forecast_error = None
 
     if request.method == "GET" and request.GET.get("city"):
         form = CitySearchForm(request.GET)
@@ -36,7 +37,9 @@ def home(request):
                     clouds=weather["clouds"],
                 )
                 forecast_data = get_forecast_data(city)
-                if 'error' not in forecast_data:
+                if "error" in forecast_data:
+                    forecast_error = forecast_data["error"]
+                else:
                     forecast = parse_forecast_data(forecast_data)
 
 
@@ -65,5 +68,6 @@ def home(request):
             "latest_searches": latest_searches,
             "city_weather": city_weather,
             "forecast": forecast,
+            "forecast_error": forecast_error,
         },
     )
