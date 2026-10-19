@@ -88,3 +88,23 @@ def get_forecast_data(city):
         return {
             "error": "Unable to connect to the weather service."
         }
+
+
+def parse_forecast_data(data):
+    forecast_list = []
+    for entry in data["list"]:
+        forecast_list.append({
+            "datetime": entry["dt_txt"],
+            "temperature": entry["main"]["temp"],
+            "feels_like": entry["main"]["feels_like"],
+            "humidity": entry["main"]["humidity"],
+            "description": entry["weather"][0]["description"],
+            "icon": entry["weather"][0]["icon"],
+            "wind_speed": entry["wind"]["speed"],
+            "clouds": entry["clouds"]["all"],
+        })
+    return {
+        "city": data["city"]["name"],
+        "country": data["city"]["country"],
+        "forecast": forecast_list,
+    }
