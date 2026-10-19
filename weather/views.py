@@ -19,6 +19,7 @@ def home(request):
     error = None
     forecast = None
     forecast_chart = None
+    humidity_chart = None
     forecast_error = None
 
     if request.method == "GET" and request.GET.get("city"):
@@ -63,6 +64,10 @@ def home(request):
                         "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
                         "temperatures": [entry["temperature"] for entry in parsed_forecast["forecast"]],
                     }
+                    humidity_chart = {
+                        "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
+                        "humidities": [entry["humidity"] for entry in parsed_forecast["forecast"]],
+                    }
 
 
 
@@ -91,6 +96,7 @@ def home(request):
             "city_weather": city_weather,
             "forecast": forecast,
             "forecast_chart": forecast_chart,
+            "humidity_chart": humidity_chart,
             "forecast_error": forecast_error,
             "statistics": statistics,
         },

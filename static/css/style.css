@@ -250,6 +250,9 @@ footer {
 .temperature-trends-card {
     min-width: 0;
 }
+.humidity-trends-card {
+    min-width: 0;
+}
 
 .temperature-chart-container {
     position: relative;
