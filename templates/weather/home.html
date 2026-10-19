@@ -195,13 +195,27 @@ Weather Dashboard
                 {% endif %}
             </div>
 
-
-            <div class="dashboard-card">
+            <div class="dashboard-card humidity-trends-card">
                 <h3>Humidity Trends</h3>
 
-                <p>
-                    Humidity analysis will be displayed here.
-                </p>
+                {% if humidity_chart and humidity_chart.labels %}
+                    <div class="temperature-chart-container">
+                        <p id="humidityChartDescription" class="visually-hidden">
+                            Line chart showing forecast humidity percentages over time.
+                        </p>
+
+                        <canvas
+                            id="humidityTrendChart"
+                            aria-describedby="humidityChartDescription"
+                        >
+                            Your browser does not support the canvas element.
+                        </canvas>
+                    </div>
+                {% elif forecast_error %}
+                    <p class="dashboard-error">{{ forecast_error }}</p>
+                {% else %}
+                    <p>Search for a city to view humidity trends.</p>
+                {% endif %}
             </div>
 
         </div>
@@ -259,6 +273,8 @@ Weather Dashboard
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {{ forecast_chart.labels|json_script:"temperature-labels" }}
 {{ forecast_chart.temperatures|json_script:"temperature-values" }}
+{{ humidity_chart.labels|json_script:"humidity-labels" }}
+{{ humidity_chart.humidities|json_script:"humidity-values" }}
 
 <script>
     (() => {
@@ -317,6 +333,69 @@ Weather Dashboard
                 }
             }
         });
+        const humidityCanvas = document.getElementById("humidityTrendChart");
+        const humidityLabelsElement = document.getElementById("humidity-labels");
+        const humidityValuesElement = document.getElementById("humidity-values");
+
+        if (
+            humidityCanvas &&
+            humidityLabelsElement &&
+            humidityValuesElement
+        ) {
+            const humidityLabels = JSON.parse(
+                humidityLabelsElement.textContent
+            );
+            const humidities = JSON.parse(
+                humidityValuesElement.textContent
+            );
+
+            new Chart(humidityCanvas, {
+                type: "line",
+                data: {
+                    labels: humidityLabels,
+                    datasets: [{
+                        label: "Humidity (%)",
+                        data: humidities,
+                        borderColor: "#0891b2",
+                        backgroundColor: "rgba(8, 145, 178, 0.12)",
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: "index"
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: "Forecast Time"
+                            },
+                            ticks: {
+                                maxTicksLimit: 6,
+                                maxRotation: 45,
+                                minRotation: 0
+                            }
+                        },
+                        y: {
+                            min: 0,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: "Humidity (%)"
+                            }
+                        }
+                    }
+                }
+            });
+        }
     })();
 </script>
 {% endif %}

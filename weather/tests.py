@@ -88,6 +88,17 @@ class WeatherChartTests(TestCase):
         # Check that temperatures match the temp values from the mock
         expected_temps = [22.0, 23.0, 21.0]
         self.assertEqual(list(forecast_chart['temperatures']), expected_temps)
+        # Humidity chart assertions
+        humidity_chart = response.context["humidity_chart"]
+        self.assertIsNotNone(humidity_chart)
+        self.assertEqual(
+            list(humidity_chart["labels"]),
+            expected_labels,
+        )
+        self.assertEqual(
+            list(humidity_chart["humidities"]),
+            [60, 55, 50],
+        )
 
     @patch('weather.views.get_weather_data')
     @patch('weather.views.get_forecast_data')
@@ -118,3 +129,5 @@ class WeatherChartTests(TestCase):
         # Also check that forecast_error is set
         self.assertIn('forecast_error', response.context)
         self.assertIsNotNone(response.context['forecast_error'])
+        # Humidity chart assertion
+        self.assertIsNone(response.context["humidity_chart"])
