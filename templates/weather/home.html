@@ -136,6 +136,8 @@ Weather Dashboard
                         </div>
                     {% endfor %}
                 </div>
+            {% elif forecast_error %}
+                <p class="dashboard-error">{{ forecast_error }}</p>
             {% else %}
                 <p>Search for a city to view the weather forecast.</p>
             {% endif %}
