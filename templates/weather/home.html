@@ -1,31 +1,30 @@
 {% extends "base.html" %}
 
 {% block title %}
-Weather Dashboard
+Weather Dashboard — WeatherLab
 {% endblock %}
 
 {% block content %}
 
 <div class="dashboard">
 
-    <!-- Dashboard Header -->
-    <section class="dashboard-header">
-        <h1>Weather Dashboard</h1>
-
-        <p>
-            Real-Time Weather Analysis
-        </p>
+    <!-- Hero Header -->
+    <section class="hero" aria-labelledby="dashboard-heading">
+        <h1 id="dashboard-heading">Weather Dashboard</h1>
+        <p>Real-time weather analysis, forecasts &amp; trends</p>
     </section>
 
 
     <!-- City Search -->
-    <section class="dashboard-search">
-        <h2>Search Weather</h2>
-
-        <form method="get">
+    <section class="search-section" aria-label="City search">
+        <form method="get" class="search-form" id="citySearchForm">
             {{ form.as_p }}
 
-            <button type="submit">
+            <button type="submit" class="btn" id="searchButton">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.3-4.3"/>
+                </svg>
                 Search
             </button>
         </form>
@@ -34,370 +33,588 @@ Weather Dashboard
 
     <!-- Error Message -->
     {% if error %}
-        <section class="dashboard-message">
-            <p>{{ error }}</p>
-        </section>
+        <div class="message message--error" role="alert" id="errorMessage">
+            <strong>Error:</strong> {{ error }}
+        </div>
     {% endif %}
 
 
     <!-- Current Weather -->
-    <section class="dashboard-section">
-        <h2>Current Weather</h2>
+    <section class="section" aria-labelledby="current-weather-heading">
+        <div class="section-header">
+            <h2 id="current-weather-heading">
+                <span class="section-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/><line x1="4.22" x2="5.64" y1="4.22" y2="5.64"/><line x1="18.36" x2="19.78" y1="18.36" y2="19.78"/><line x1="1" x2="3" y1="12" y2="12"/><line x1="21" x2="23" y1="12" y2="12"/><line x1="4.22" x2="5.64" y1="19.78" y2="18.36"/><line x1="18.36" x2="19.78" y1="5.64" y2="4.22"/>
+                    </svg>
+                </span>
+                Current Weather
+            </h2>
+        </div>
 
-        {% if weather %}
+        <div class="section-body">
+            {% if weather %}
 
-            <div class="weather-card">
-
-                <div class="weather-location">
-                    <h3>
-                        {{ weather.city }}, {{ weather.country }}
-                    </h3>
-                    <img
-                        src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
-                        alt="{{ weather.description }}"
-                        class="weather-icon"
-                    >
-                    <p>
-                        {{ weather.description|title }}
-                    </p>
-                </div>
-
-
-                <div class="weather-metrics">
-
-                    <div class="metric-card">
-                        <h4>Temperature</h4>
-                        <p>{{ weather.temperature }}°C</p>
+                <!-- Weather hero: icon + temp + location -->
+                <div class="weather-hero">
+                    <div class="weather-hero-icon">
+                        <img
+                            src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
+                            alt="{{ weather.description }}"
+                            width="100"
+                            height="100"
+                        >
                     </div>
 
-
-                    <div class="metric-card">
-                        <h4>Feels Like</h4>
-                        <p>{{ weather.feels_like }}°C</p>
-                    </div>
-
-
-                    <div class="metric-card">
-                        <h4>Humidity</h4>
-                        <p>{{ weather.humidity }}%</p>
-                    </div>
-
-
-                    <div class="metric-card">
-                        <h4>Pressure</h4>
-                        <p>{{ weather.pressure }} hPa</p>
-                    </div>
-
-
-                    <div class="metric-card">
-                        <h4>Wind Speed</h4>
-                        <p>{{ weather.wind_speed }} m/s</p>
-                    </div>
-
-
-                    <div class="metric-card">
-                        <h4>Cloudiness</h4>
-                        <p>{{ weather.clouds }}%</p>
-                    </div>
-
-                </div>
-
-            </div>
-
-        {% else %}
-
-            <div class="weather-card">
-                <p>
-                    Search for a city to view current weather.
-                </p>
-            </div>
-
-        {% endif %}
-    </section>
-
-
-    <!-- Forecast -->
-    <section class="dashboard-section">
-        <h2>Forecast</h2>
-
-        <div class="dashboard-card">
-            {% if forecast %}
-                <div class="forecast-grid">
-                    {% for entry in forecast.forecast %}
-                        <div class="forecast-card">
-                            <p class="forecast-date">{{ entry.date }}</p>
-                            <img
-                                src="https://openweathermap.org/img/wn/{{ entry.icon }}@2x.png"
-                                alt="{{ entry.description }}"
-                                class="forecast-icon"
-                            >
-                            <p class="forecast-description">{{ entry.description|title }}</p>
-                            <div class="forecast-temperatures">
-                                <span>{{ entry.min_temperature }}°C</span>
-                                <span>{{ entry.max_temperature }}°C</span>
-                            </div>
+                    <div class="weather-hero-info">
+                        <h3 class="weather-hero-location">{{ weather.city }}, {{ weather.country }}</h3>
+                        <p class="weather-hero-description">{{ weather.description|title }}</p>
+                        <div class="weather-hero-temp">
+                            <span class="temp-value">{{ weather.temperature }}°</span>
+                            <span class="temp-feels">Feels like {{ weather.feels_like }}°C</span>
                         </div>
-                    {% endfor %}
+                    </div>
                 </div>
-            {% elif forecast_error %}
-                <p class="dashboard-error">{{ forecast_error }}</p>
+
+                <!-- Metric tiles -->
+                <div class="metrics-grid">
+                    <div class="metric-tile">
+                        <div class="metric-icon metric-icon--humidity" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                            </svg>
+                        </div>
+                        <div class="metric-content">
+                            <div class="metric-label">Humidity</div>
+                            <div class="metric-value">{{ weather.humidity }}%</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-tile">
+                        <div class="metric-icon metric-icon--pressure" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><circle cx="12" cy="14" r="4"/>
+                            </svg>
+                        </div>
+                        <div class="metric-content">
+                            <div class="metric-label">Pressure</div>
+                            <div class="metric-value">{{ weather.pressure }} hPa</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-tile">
+                        <div class="metric-icon metric-icon--wind" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                            </svg>
+                        </div>
+                        <div class="metric-content">
+                            <div class="metric-label">Wind Speed</div>
+                            <div class="metric-value">{{ weather.wind_speed }} m/s</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-tile">
+                        <div class="metric-icon metric-icon--clouds" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                            </svg>
+                        </div>
+                        <div class="metric-content">
+                            <div class="metric-label">Cloudiness</div>
+                            <div class="metric-value">{{ weather.clouds }}%</div>
+                        </div>
+                    </div>
+                </div>
+
             {% else %}
-                <p>Search for a city to view the weather forecast.</p>
+
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                    </svg>
+                    <p>Search for a city to view current weather.</p>
+                </div>
+
             {% endif %}
         </div>
     </section>
 
 
-    <!-- Weather Analysis -->
-    <section class="dashboard-section">
-        <h2>Weather Analysis</h2>
+    <!-- Forecast -->
+    <section class="section" aria-labelledby="forecast-heading">
+        <div class="section-header">
+            <h2 id="forecast-heading">
+                <span class="section-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
+                    </svg>
+                </span>
+                Forecast
+            </h2>
+        </div>
 
-        <div class="analysis-grid">
+        <div class="section-body">
+            {% if forecast %}
+                <div class="forecast-grid">
+                    {% for entry in forecast.forecast %}
+                        <div class="forecast-card">
+                            <div class="forecast-date">{{ entry.date }}</div>
+                            <img
+                                src="https://openweathermap.org/img/wn/{{ entry.icon }}@2x.png"
+                                alt="{{ entry.description }}"
+                                class="forecast-icon"
+                                width="56"
+                                height="56"
+                            >
+                            <div class="forecast-description">{{ entry.description|title }}</div>
+                            <div class="forecast-temps">
+                                <span class="temp-high" title="Maximum temperature">{{ entry.max_temperature }}°</span>
+                                <span class="temp-separator">/</span>
+                                <span class="temp-low" title="Minimum temperature">{{ entry.min_temperature }}°</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% elif forecast_error %}
+                <div class="message message--error" role="alert">{{ forecast_error }}</div>
+            {% else %}
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
+                    </svg>
+                    <p>Search for a city to view the weather forecast.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
 
 
-            <div class="dashboard-card">
-                <h3>Statistics</h3>
+    <!-- Weather Statistics -->
+    <section class="section" aria-labelledby="stats-heading">
+        <div class="section-header">
+            <h2 id="stats-heading">
+                <span class="section-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+                    </svg>
+                </span>
+                Weather Statistics
+            </h2>
+        </div>
 
-                {% if statistics %}
-                    <p>Average Temperature: {{ statistics.avg_temperature }} °C</p>
-                    <p>Maximum Temperature: {{ statistics.max_temperature }} °C</p>
-                    <p>Minimum Temperature: {{ statistics.min_temperature }} °C</p>
-                    <p>Average Humidity: {{ statistics.avg_humidity }}%</p>
-                    <p>Average Wind Speed: {{ statistics.avg_wind_speed }} m/s</p>
-                {% else %}
-                    <p>Search for a city to view weather statistics.</p>
-                {% endif %}
-            </div>
-
-
-
-            <div class="dashboard-card temperature-trends-card">
-                <h3>Temperature Trends</h3>
-
-                {% if forecast_chart and forecast_chart.labels %}
-                    <div class="temperature-chart-container">
-                        <p id="temperatureChartDescription" class="visually-hidden">
-                            Line chart showing forecast temperatures in degrees Celsius
-                            over time.
-                        </p>
-
-                        <canvas
-                            id="temperatureTrendChart"
-                            aria-describedby="temperatureChartDescription"
-                        >
-                            Your browser does not support the canvas element.
-                        </canvas>
+        <div class="section-body">
+            {% if statistics %}
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon--temp-avg" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.avg_temperature }}°C</div>
+                        <div class="stat-label">Avg Temperature</div>
                     </div>
-                {% elif forecast_error %}
-                    <p class="dashboard-error">{{ forecast_error }}</p>
-                {% else %}
-                    <p>Search for a city to view temperature trends.</p>
-                {% endif %}
-            </div>
 
-            <div class="dashboard-card humidity-trends-card">
-                <h3>Humidity Trends</h3>
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon--temp-max" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/><line x1="20" x2="20" y1="7" y2="11"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.max_temperature }}°C</div>
+                        <div class="stat-label">Max Temperature</div>
+                    </div>
 
-                {% if humidity_chart and humidity_chart.labels %}
-                    <div class="temperature-chart-container">
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon--temp-min" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.min_temperature }}°C</div>
+                        <div class="stat-label">Min Temperature</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon--humidity" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.avg_humidity }}%</div>
+                        <div class="stat-label">Avg Humidity</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon--wind" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.avg_wind_speed }} m/s</div>
+                        <div class="stat-label">Avg Wind Speed</div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+                    </svg>
+                    <p>Search for a city to view weather statistics.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+
+    <!-- Charts: Temperature & Humidity -->
+    <section class="section" aria-labelledby="trends-heading">
+        <div class="section-header">
+            <h2 id="trends-heading">
+                <span class="section-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                </span>
+                Trend Charts
+            </h2>
+        </div>
+
+        <div class="section-body">
+            <div class="charts-grid">
+
+                <!-- Temperature Trends -->
+                <div class="chart-card">
+                    <h3>
+                        <span class="chart-dot chart-dot--temp" aria-hidden="true"></span>
+                        Temperature Trends
+                    </h3>
+                    {% if forecast_chart and forecast_chart.labels %}
+                        <p id="temperatureChartDescription" class="visually-hidden">
+                            Line chart showing forecast temperatures in degrees Celsius over time.
+                        </p>
+                        <div class="chart-container">
+                            <canvas
+                                id="temperatureTrendChart"
+                                aria-describedby="temperatureChartDescription"
+                            >
+                                Your browser does not support the canvas element.
+                            </canvas>
+                        </div>
+                    {% elif forecast_error %}
+                        <div class="message message--error">{{ forecast_error }}</div>
+                    {% else %}
+                        <div class="chart-empty">
+                            <p>Search for a city to view temperature trends.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Humidity Trends -->
+                <div class="chart-card">
+                    <h3>
+                        <span class="chart-dot chart-dot--humidity" aria-hidden="true"></span>
+                        Humidity Trends
+                    </h3>
+                    {% if humidity_chart and humidity_chart.labels %}
                         <p id="humidityChartDescription" class="visually-hidden">
                             Line chart showing forecast humidity percentages over time.
                         </p>
+                        <div class="chart-container">
+                            <canvas
+                                id="humidityTrendChart"
+                                aria-describedby="humidityChartDescription"
+                            >
+                                Your browser does not support the canvas element.
+                            </canvas>
+                        </div>
+                    {% elif forecast_error %}
+                        <div class="message message--error">{{ forecast_error }}</div>
+                    {% else %}
+                        <div class="chart-empty">
+                            <p>Search for a city to view humidity trends.</p>
+                        </div>
+                    {% endif %}
+                </div>
 
-                        <canvas
-                            id="humidityTrendChart"
-                            aria-describedby="humidityChartDescription"
-                        >
-                            Your browser does not support the canvas element.
-                        </canvas>
-                    </div>
-                {% elif forecast_error %}
-                    <p class="dashboard-error">{{ forecast_error }}</p>
-                {% else %}
-                    <p>Search for a city to view humidity trends.</p>
-                {% endif %}
             </div>
-
         </div>
     </section>
 
 
     <!-- Search History -->
-    <section class="dashboard-section">
-        <h2>Search History</h2>
+    <section class="section" aria-labelledby="history-heading">
+        <div class="section-header">
+            <h2 id="history-heading">
+                <span class="section-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                </span>
+                Search History
+            </h2>
+        </div>
 
-        {% if history %}
-
-            <div class="history-list">
-
-                {% for item in history %}
-
-                    <div class="history-item">
-
-                        <strong>
-                            {{ item.city }}, {{ item.country }}
-                        </strong>
-
-                        <p>
-                            {{ item.temperature }}°C |
-                            {{ item.description }}
-                        </p>
-
-                        <p>
-                            Humidity: {{ item.humidity }}% |
-                            Wind: {{ item.wind_speed }} m/s
-                        </p>
-
-                        <p>
-                            Searched at: {{ item.searched_at }}
-                        </p>
-
-                    </div>
-
-                {% endfor %}
-
-            </div>
-
-        {% else %}
-
-            <p>
-                No weather searches yet.
-            </p>
-
-        {% endif %}
-
+        <div class="section-body">
+            {% if history %}
+                <div class="history-grid">
+                    {% for item in history %}
+                        <div class="history-card">
+                            <div class="history-card-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                                </svg>
+                            </div>
+                            <div class="history-card-body">
+                                <div class="history-card-city">{{ item.city }}, {{ item.country }}</div>
+                                <div class="history-card-detail">
+                                    {{ item.description|title }} &middot; Humidity {{ item.humidity }}% &middot; Wind {{ item.wind_speed }} m/s
+                                </div>
+                            </div>
+                            <div class="history-card-meta">
+                                <div class="history-card-temp">{{ item.temperature }}°C</div>
+                                <div class="history-card-time">{{ item.searched_at|date:"M d, H:i" }}</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                    <p>No weather searches yet.</p>
+                </div>
+            {% endif %}
+        </div>
     </section>
 
 </div>
-{% if forecast_chart and forecast_chart.labels %}
+
+{% endblock %}
+
+
+{% block scripts %}
+
+{% if forecast_chart and forecast_chart.labels or humidity_chart and humidity_chart.labels %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{{ forecast_chart.labels|json_script:"temperature-labels" }}
-{{ forecast_chart.temperatures|json_script:"temperature-values" }}
-{{ humidity_chart.labels|json_script:"humidity-labels" }}
-{{ humidity_chart.humidities|json_script:"humidity-values" }}
-
-<script>
-    (() => {
-        const canvas = document.getElementById("temperatureTrendChart");
-        const labelsElement = document.getElementById("temperature-labels");
-        const valuesElement = document.getElementById("temperature-values");
-
-        if (!canvas || !labelsElement || !valuesElement || !window.Chart) {
-            return;
-        }
-
-        const labels = JSON.parse(labelsElement.textContent);
-        const temperatures = JSON.parse(valuesElement.textContent);
-
-        new Chart(canvas, {
-            type: "line",
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: "Temperature (°C)",
-                    data: temperatures,
-                    borderColor: "#2563eb",
-                    backgroundColor: "rgba(37, 99, 235, 0.12)",
-                    borderWidth: 2,
-                    pointRadius: 2,
-                    pointHoverRadius: 5,
-                    fill: true,
-                    tension: 0.3
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    intersect: false,
-                    mode: "index"
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: "Forecast Time"
-                        },
-                        ticks: {
-                            maxTicksLimit: 6,
-                            maxRotation: 45,
-                            minRotation: 0
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: "Temperature (°C)"
-                        }
-                    }
-                }
-            }
-        });
-        const humidityCanvas = document.getElementById("humidityTrendChart");
-        const humidityLabelsElement = document.getElementById("humidity-labels");
-        const humidityValuesElement = document.getElementById("humidity-values");
-
-        if (
-            humidityCanvas &&
-            humidityLabelsElement &&
-            humidityValuesElement
-        ) {
-            const humidityLabels = JSON.parse(
-                humidityLabelsElement.textContent
-            );
-            const humidities = JSON.parse(
-                humidityValuesElement.textContent
-            );
-
-            new Chart(humidityCanvas, {
-                type: "line",
-                data: {
-                    labels: humidityLabels,
-                    datasets: [{
-                        label: "Humidity (%)",
-                        data: humidities,
-                        borderColor: "#0891b2",
-                        backgroundColor: "rgba(8, 145, 178, 0.12)",
-                        borderWidth: 2,
-                        pointRadius: 2,
-                        pointHoverRadius: 5,
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: "index"
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: "Forecast Time"
-                            },
-                            ticks: {
-                                maxTicksLimit: 6,
-                                maxRotation: 45,
-                                minRotation: 0
-                            }
-                        },
-                        y: {
-                            min: 0,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: "Humidity (%)"
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    })();
-</script>
 {% endif %}
 
+{% if forecast_chart and forecast_chart.labels %}
+{{ forecast_chart.labels|json_script:"temperature-labels" }}
+{{ forecast_chart.temperatures|json_script:"temperature-values" }}
+{% endif %}
+
+{% if humidity_chart and humidity_chart.labels %}
+{{ humidity_chart.labels|json_script:"humidity-labels" }}
+{{ humidity_chart.humidities|json_script:"humidity-values" }}
+{% endif %}
+
+<script>
+    function initializeWeatherCharts() {
+        const rootStyles = getComputedStyle(document.documentElement);
+
+        // ── Temperature Trend Chart ──────────────────────────────
+        try {
+            const tempCanvas = document.getElementById("temperatureTrendChart");
+            const tempLabelsEl = document.getElementById("temperature-labels");
+            const tempValuesEl = document.getElementById("temperature-values");
+
+            if (tempCanvas && tempLabelsEl && tempValuesEl && window.Chart) {
+                const labels = JSON.parse(tempLabelsEl.textContent);
+                const temps = JSON.parse(tempValuesEl.textContent);
+
+                // Format labels: "2021-01-07 12:00:00" → "Jan 7, 12:00"
+                const fmtLabels = labels.map(label => {
+                const date = new Date(label.replace(" ", "T"));
+
+                if (Number.isNaN(date.getTime())) {
+                    return label;
+                }
+
+                const datePart = date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric"
+                });
+
+                const timePart = date.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false
+                });
+
+                return `${datePart}, ${timePart}`;
+            });
+
+                new Chart(tempCanvas, {
+                    type: "line",
+                    data: {
+                        labels: fmtLabels,
+                        datasets: [{
+                            label: "Temperature (°C)",
+                            data: temps,
+                            borderColor: rootStyles.getPropertyValue("--chart-temp-line").trim() || "#3b6cf5",
+                            backgroundColor: rootStyles.getPropertyValue("--chart-temp-fill").trim() || "rgba(59,108,245,0.10)",
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: rootStyles.getPropertyValue("--chart-temp-line").trim() || "#3b6cf5",
+                            pointHoverRadius: 6,
+                            pointHoverBackgroundColor: "#fff",
+                            pointHoverBorderWidth: 2,
+                            fill: true,
+                            tension: 0.35
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: "index" },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: "top",
+                                align: "end",
+                                labels: {
+                                    usePointStyle: true,
+                                    pointStyle: "circle",
+                                    padding: 16,
+                                    font: { family: "'Inter', sans-serif", size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: "rgba(26, 29, 35, 0.92)",
+                                titleFont: { family: "'Inter', sans-serif", size: 12 },
+                                bodyFont: { family: "'Inter', sans-serif", size: 13, weight: "600" },
+                                padding: 10,
+                                cornerRadius: 8,
+                                callbacks: {
+                                    label: ctx => ` ${ctx.parsed.y}°C`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: "Forecast Time", font: { family: "'Inter', sans-serif", size: 12 } },
+                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: { display: true, text: "Temperature (°C)", font: { family: "'Inter', sans-serif", size: 12 } },
+                                ticks: { font: { size: 11 } },
+                                grid: { color: "rgba(0,0,0,0.05)" }
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Temperature chart initialization error:", e);
+        }
+
+        // ── Humidity Trend Chart ─────────────────────────────────
+        try {
+            const humCanvas = document.getElementById("humidityTrendChart");
+            const humLabelsEl = document.getElementById("humidity-labels");
+            const humValuesEl = document.getElementById("humidity-values");
+
+            if (humCanvas && humLabelsEl && humValuesEl && window.Chart) {
+                const labels = JSON.parse(humLabelsEl.textContent);
+                const humidities = JSON.parse(humValuesEl.textContent);
+
+                const fmtLabels = labels.map(label => {
+                    const date = new Date(label.replace(" ", "T"));
+
+                    if (Number.isNaN(date.getTime())) {
+                        return label;
+                    }
+
+                    const datePart = date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric"
+                    });
+
+                    const timePart = date.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false
+                    });
+
+                    return `${datePart}, ${timePart}`;
+                });
+
+                new Chart(humCanvas, {
+                    type: "line",
+                    data: {
+                        labels: fmtLabels,
+                        datasets: [{
+                            label: "Humidity (%)",
+                            data: humidities,
+                            borderColor: rootStyles.getPropertyValue("--chart-humidity-line").trim() || "#0ea5c7",
+                            backgroundColor: rootStyles.getPropertyValue("--chart-humidity-fill").trim() || "rgba(14,165,199,0.10)",
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: rootStyles.getPropertyValue("--chart-humidity-line").trim() || "#0ea5c7",
+                            pointHoverRadius: 6,
+                            pointHoverBackgroundColor: "#fff",
+                            pointHoverBorderWidth: 2,
+                            fill: true,
+                            tension: 0.35
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: "index" },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: "top",
+                                align: "end",
+                                labels: {
+                                    usePointStyle: true,
+                                    pointStyle: "circle",
+                                    padding: 16,
+                                    font: { family: "'Inter', sans-serif", size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: "rgba(26, 29, 35, 0.92)",
+                                titleFont: { family: "'Inter', sans-serif", size: 12 },
+                                bodyFont: { family: "'Inter', sans-serif", size: 13, weight: "600" },
+                                padding: 10,
+                                cornerRadius: 8,
+                                callbacks: {
+                                    label: ctx => ` ${ctx.parsed.y}%`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: "Forecast Time", font: { family: "'Inter', sans-serif", size: 12 } },
+                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                title: { display: true, text: "Humidity (%)", font: { family: "'Inter', sans-serif", size: 12 } },
+                                ticks: { font: { size: 11 } },
+                                grid: { color: "rgba(0,0,0,0.05)" }
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Humidity chart initialization error:", e);
+        }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeWeatherCharts);
+    } else {
+        initializeWeatherCharts();
+    }
+</script>
 {% endblock %}
