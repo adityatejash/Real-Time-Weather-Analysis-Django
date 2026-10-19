@@ -18,6 +18,7 @@ def home(request):
     weather = None
     error = None
     forecast = None
+    forecast_chart = None
     forecast_error = None
 
     if request.method == "GET" and request.GET.get("city"):
@@ -58,6 +59,10 @@ def home(request):
                         "country": parsed_forecast["country"],
                         "forecast": summarize_daily_forecast(parsed_forecast),
                     }
+                    forecast_chart = {
+                        "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
+                        "temperatures": [entry["temperature"] for entry in parsed_forecast["forecast"]],
+                    }
 
 
 
@@ -85,6 +90,7 @@ def home(request):
             "latest_searches": latest_searches,
             "city_weather": city_weather,
             "forecast": forecast,
+            "forecast_chart": forecast_chart,
             "forecast_error": forecast_error,
             "statistics": statistics,
         },
