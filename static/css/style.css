@@ -39,7 +39,7 @@ footer {
 
 .dashboard-header {
     padding: 2rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
     background: #ffffff;
     border: 1px solid #ddd;
     border-radius: 10px;
@@ -54,8 +54,8 @@ footer {
 }
 
 .dashboard-search {
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
     background: #ffffff;
     border: 1px solid #ddd;
     border-radius: 10px;
@@ -86,16 +86,16 @@ footer {
 }
 
 .dashboard-message {
-    padding: 1rem;
-    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
     background: #ffffff;
     border: 1px solid #ddd;
     border-radius: 10px;
 }
 
 .dashboard-section {
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
     background: #ffffff;
     border: 1px solid #ddd;
     border-radius: 10px;
@@ -188,6 +188,13 @@ footer {
     .analysis-grid,
     .weather-metrics {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .analysis-grid,
+    .weather-metrics {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
