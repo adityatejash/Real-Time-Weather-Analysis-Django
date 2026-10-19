@@ -121,9 +121,24 @@ Weather Dashboard
         <h2>Forecast</h2>
 
         <div class="dashboard-card">
-            <p>
-                Forecast information will be available here.
-            </p>
+            {% if forecast %}
+                <div class="forecast-grid">
+                    {% for entry in forecast.forecast %}
+                        <div class="forecast-card">
+                            <p class="forecast-date">{{ entry.datetime }}</p>
+                            <img
+                                src="https://openweathermap.org/img/wn/{{ entry.icon }}@2x.png"
+                                alt="{{ entry.description }}"
+                                class="forecast-icon"
+                            >
+                            <p class="forecast-description">{{ entry.description|title }}</p>
+                            <p class="forecast-temperature">{{ entry.temperature }}°C</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>Search for a city to view the weather forecast.</p>
+            {% endif %}
         </div>
     </section>
 
