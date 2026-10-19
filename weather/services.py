@@ -53,3 +53,38 @@ def parse_weather_data(data):
         "clouds": data["clouds"]["all"],
         "icon": data["weather"][0]["icon"],
     }
+
+
+def get_forecast_data(city):
+    forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+    params = {
+        "q": city,
+        "appid": settings.WEATHER_API_KEY,
+        "units": "metric",
+    }
+
+    try:
+        response = requests.get(
+            forecast_url,
+            params=params,
+            timeout=10,
+        )
+
+        if response.status_code == 404:
+            return {
+                "error": "City not found."
+            }
+
+        response.raise_for_status()
+
+        return response.json()
+
+    except requests.exceptions.Timeout:
+        return {
+            "error": "Weather service request timed out."
+        }
+
+    except requests.exceptions.RequestException:
+        return {
+            "error": "Unable to connect to the weather service."
+        }
