@@ -204,3 +204,39 @@ footer {
     display: block;
     margin: 0 auto 1rem;
 }
+
+.forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.forecast-card {
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 0;
+}
+
+.forecast-date,
+.forecast-description {
+    overflow-wrap: anywhere;
+}
+
+.forecast-icon {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.forecast-temperature {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .forecast-grid {
+        grid-template-columns: 1fr;
+    }
+}

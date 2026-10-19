@@ -2,13 +2,14 @@ from django.shortcuts import render
 
 from .forms import CitySearchForm
 from .models import WeatherData
-from .services import get_weather_data, parse_weather_data
+from .services import get_weather_data, parse_weather_data, get_forecast_data, parse_forecast_data
 
 
 def home(request):
     form = CitySearchForm()
     weather = None
     error = None
+    forecast = None
 
     if request.method == "GET" and request.GET.get("city"):
         form = CitySearchForm(request.GET)
@@ -34,6 +35,11 @@ def home(request):
                     wind_speed=weather["wind_speed"],
                     clouds=weather["clouds"],
                 )
+                forecast_data = get_forecast_data(city)
+                if 'error' not in forecast_data:
+                    forecast = parse_forecast_data(forecast_data)
+
+
 
     history = WeatherData.objects.all()
 
@@ -58,5 +64,6 @@ def home(request):
             "history": history,
             "latest_searches": latest_searches,
             "city_weather": city_weather,
+            "forecast": forecast,
         },
     )
