@@ -138,3 +138,29 @@ def summarize_daily_forecast(parsed_forecast):
         })
 
     return summaries
+
+
+def calculate_forecast_statistics(parsed_forecast):
+    """Calculate summary statistics from forecast data."""
+    entries = parsed_forecast.get("forecast", [])
+
+    if not entries:
+        return {
+            "avg_temperature": None,
+            "max_temperature": None,
+            "min_temperature": None,
+            "avg_humidity": None,
+            "avg_wind_speed": None,
+        }
+
+    temperatures = [entry["temperature"] for entry in entries]
+    humidities = [entry["humidity"] for entry in entries]
+    wind_speeds = [entry["wind_speed"] for entry in entries]
+
+    return {
+        "avg_temperature": round(sum(temperatures) / len(temperatures), 2),
+        "max_temperature": max(temperatures),
+        "min_temperature": min(temperatures),
+        "avg_humidity": round(sum(humidities) / len(humidities), 2),
+        "avg_wind_speed": round(sum(wind_speeds) / len(wind_speeds), 2),
+    }
