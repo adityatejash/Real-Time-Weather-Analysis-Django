@@ -51,4 +51,5 @@ def parse_weather_data(data):
         "description": data["weather"][0]["description"],
         "wind_speed": data["wind"]["speed"],
         "clouds": data["clouds"]["all"],
+        "icon": data["weather"][0]["icon"],
     }
