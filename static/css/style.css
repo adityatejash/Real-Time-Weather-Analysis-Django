@@ -190,3 +190,10 @@ footer {
         grid-template-columns: 1fr;
     }
 }
+
+.weather-icon {
+    width: 100px;
+    height: 100px;
+    display: block;
+    margin: 0 auto 1rem;
+}

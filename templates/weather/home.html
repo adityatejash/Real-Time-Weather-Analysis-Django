@@ -52,7 +52,11 @@ Weather Dashboard
                     <h3>
                         {{ weather.city }}, {{ weather.country }}
                     </h3>
-
+                    <img
+                        src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
+                        alt="{{ weather.description }}"
+                        class="weather-icon"
+                    >
                     <p>
                         {{ weather.description|title }}
                     </p>
