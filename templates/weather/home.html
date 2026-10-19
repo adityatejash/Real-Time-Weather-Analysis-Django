@@ -171,12 +171,28 @@ Weather Dashboard
 
 
 
-            <div class="dashboard-card">
+            <div class="dashboard-card temperature-trends-card">
                 <h3>Temperature Trends</h3>
 
-                <p>
-                    Temperature analysis will be displayed here.
-                </p>
+                {% if forecast_chart and forecast_chart.labels %}
+                    <div class="temperature-chart-container">
+                        <p id="temperatureChartDescription" class="visually-hidden">
+                            Line chart showing forecast temperatures in degrees Celsius
+                            over time.
+                        </p>
+
+                        <canvas
+                            id="temperatureTrendChart"
+                            aria-describedby="temperatureChartDescription"
+                        >
+                            Your browser does not support the canvas element.
+                        </canvas>
+                    </div>
+                {% elif forecast_error %}
+                    <p class="dashboard-error">{{ forecast_error }}</p>
+                {% else %}
+                    <p>Search for a city to view temperature trends.</p>
+                {% endif %}
             </div>
 
 
@@ -239,5 +255,70 @@ Weather Dashboard
     </section>
 
 </div>
+{% if forecast_chart and forecast_chart.labels %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{{ forecast_chart.labels|json_script:"temperature-labels" }}
+{{ forecast_chart.temperatures|json_script:"temperature-values" }}
+
+<script>
+    (() => {
+        const canvas = document.getElementById("temperatureTrendChart");
+        const labelsElement = document.getElementById("temperature-labels");
+        const valuesElement = document.getElementById("temperature-values");
+
+        if (!canvas || !labelsElement || !valuesElement || !window.Chart) {
+            return;
+        }
+
+        const labels = JSON.parse(labelsElement.textContent);
+        const temperatures = JSON.parse(valuesElement.textContent);
+
+        new Chart(canvas, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Temperature (°C)",
+                    data: temperatures,
+                    borderColor: "#2563eb",
+                    backgroundColor: "rgba(37, 99, 235, 0.12)",
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: "index"
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Forecast Time"
+                        },
+                        ticks: {
+                            maxTicksLimit: 6,
+                            maxRotation: 45,
+                            minRotation: 0
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: "Temperature (°C)"
+                        }
+                    }
+                }
+            }
+        });
+    })();
+</script>
+{% endif %}
 
 {% endblock %}
