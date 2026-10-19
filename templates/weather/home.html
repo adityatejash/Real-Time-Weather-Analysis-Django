@@ -125,14 +125,17 @@ Weather Dashboard
                 <div class="forecast-grid">
                     {% for entry in forecast.forecast %}
                         <div class="forecast-card">
-                            <p class="forecast-date">{{ entry.datetime }}</p>
+                            <p class="forecast-date">{{ entry.date }}</p>
                             <img
                                 src="https://openweathermap.org/img/wn/{{ entry.icon }}@2x.png"
                                 alt="{{ entry.description }}"
                                 class="forecast-icon"
                             >
                             <p class="forecast-description">{{ entry.description|title }}</p>
-                            <p class="forecast-temperature">{{ entry.temperature }}°C</p>
+                            <div class="forecast-temperatures">
+                                <span>{{ entry.min_temperature }}°C</span>
+                                <span>{{ entry.max_temperature }}°C</span>
+                            </div>
                         </div>
                     {% endfor %}
                 </div>

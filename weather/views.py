@@ -2,7 +2,7 @@ from django.shortcuts import render
 
 from .forms import CitySearchForm
 from .models import WeatherData
-from .services import get_weather_data, parse_weather_data, get_forecast_data, parse_forecast_data
+from .services import get_weather_data, parse_weather_data, get_forecast_data, parse_forecast_data, summarize_daily_forecast
 
 
 def home(request):
@@ -40,7 +40,12 @@ def home(request):
                 if "error" in forecast_data:
                     forecast_error = forecast_data["error"]
                 else:
-                    forecast = parse_forecast_data(forecast_data)
+                    parsed_forecast = parse_forecast_data(forecast_data)
+                forecast = {
+                    "city": parsed_forecast["city"],
+                    "country": parsed_forecast["country"],
+                    "forecast": summarize_daily_forecast(parsed_forecast),
+                }
 
 
 

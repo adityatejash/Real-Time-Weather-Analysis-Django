@@ -108,3 +108,33 @@ def parse_forecast_data(data):
         "country": data["city"]["country"],
         "forecast": forecast_list,
     }
+
+
+def summarize_daily_forecast(parsed_forecast):
+    daily_forecasts = {}
+
+    for entry in parsed_forecast["forecast"]:
+        day = entry["datetime"].split(" ")[0]
+
+        if day not in daily_forecasts:
+            daily_forecasts[day] = {
+                "date": day,
+                "temperatures": [],
+                "description": entry["description"],
+                "icon": entry["icon"],
+            }
+
+        daily_forecasts[day]["temperatures"].append(entry["temperature"])
+
+    summaries = []
+
+    for day_data in daily_forecasts.values():
+        summaries.append({
+            "date": day_data["date"],
+            "min_temperature": min(day_data["temperatures"]),
+            "max_temperature": max(day_data["temperatures"]),
+            "description": day_data["description"],
+            "icon": day_data["icon"],
+        })
+
+    return summaries
