@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -689,3 +690,121 @@ class WeatherHistoryViewTests(TestCase):
         self.assertIsNotNone(result["avg_temperature"])
         self.assertGreater(len(result["chart_labels"]), 0)
         self.assertGreater(len(result["chart_temperatures"]), 0)
+
+
+class AuthenticationConfigurationTests(TestCase):
+    """Tests verifying Django authentication is properly configured.
+
+    These tests guard the authentication foundation established by WT-033:
+    required auth/session/contenttypes/messages apps, required middleware,
+    password validators, default User model, default auth backend, and the
+    auth context processor.
+    """
+
+    def test_auth_app_installed(self):
+        from django.conf import settings
+        self.assertIn('django.contrib.auth', settings.INSTALLED_APPS)
+
+    def test_contenttypes_app_installed(self):
+        from django.conf import settings
+        self.assertIn('django.contrib.contenttypes', settings.INSTALLED_APPS)
+
+    def test_sessions_app_installed(self):
+        from django.conf import settings
+        self.assertIn('django.contrib.sessions', settings.INSTALLED_APPS)
+
+    def test_messages_app_installed(self):
+        from django.conf import settings
+        self.assertIn('django.contrib.messages', settings.INSTALLED_APPS)
+
+    def test_authentication_middleware_configured(self):
+        from django.conf import settings
+        self.assertIn(
+            'django.contrib.auth.middleware.AuthenticationMiddleware',
+            settings.MIDDLEWARE,
+        )
+
+    def test_session_middleware_configured(self):
+        from django.conf import settings
+        self.assertIn(
+            'django.contrib.sessions.middleware.SessionMiddleware',
+            settings.MIDDLEWARE,
+        )
+
+    def test_csrf_middleware_configured(self):
+        from django.conf import settings
+        self.assertIn(
+            'django.middleware.csrf.CsrfViewMiddleware',
+            settings.MIDDLEWARE,
+        )
+
+    def test_messages_middleware_configured(self):
+        from django.conf import settings
+        self.assertIn(
+            'django.contrib.messages.middleware.MessageMiddleware',
+            settings.MIDDLEWARE,
+        )
+
+    def test_password_validators_configured(self):
+        from django.conf import settings
+        validator_names = [v['NAME'] for v in settings.AUTH_PASSWORD_VALIDATORS]
+        expected = [
+            'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+            'django.contrib.auth.password_validation.MinimumLengthValidator',
+            'django.contrib.auth.password_validation.CommonPasswordValidator',
+            'django.contrib.auth.password_validation.NumericPasswordValidator',
+        ]
+        for name in expected:
+            self.assertIn(name, validator_names)
+
+    def test_default_user_model(self):
+        from django.conf import settings
+        self.assertEqual(settings.AUTH_USER_MODEL, 'auth.User')
+
+    def test_default_authentication_backend(self):
+        from django.conf import settings
+        self.assertEqual(
+            settings.AUTHENTICATION_BACKENDS,
+            ['django.contrib.auth.backends.ModelBackend'],
+        )
+
+    def test_auth_context_processor_configured(self):
+        from django.conf import settings
+        context_processors = settings.TEMPLATES[0]['OPTIONS']['context_processors']
+        self.assertIn(
+            'django.contrib.auth.context_processors.auth',
+            context_processors,
+        )
+
+
+class AuthenticationFunctionalTests(TestCase):
+    """Functional tests verifying Django authentication behavior end to end."""
+
+    def setUp(self):
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(
+            username='testuser',
+            password='testpass123',
+        )
+
+    def test_create_user_authenticate_success_and_failure(self):
+        # Correct password authenticates successfully.
+        user = authenticate(username='testuser', password='testpass123')
+        self.assertIsNotNone(user)
+        self.assertEqual(user, self.user)
+
+        # Incorrect password fails authentication.
+        user = authenticate(username='testuser', password='wrongpassword')
+        self.assertIsNone(user)
+
+    def test_client_login_authenticated_user(self):
+        # Test client can log in.
+        self.assertTrue(
+            self.client.login(username='testuser', password='testpass123')
+        )
+
+        # Access a public page and verify request.user is authenticated.
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['user'].is_authenticated)
+        self.assertEqual(response.context['user'], self.user)
