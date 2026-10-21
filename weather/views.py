@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.shortcuts import render
 
 from .forms import CitySearchForm
@@ -10,6 +12,7 @@ from .services import (
     summarize_daily_forecast,
     calculate_forecast_statistics,
     generate_weather_insights,
+    analyze_weather_history,
 )
 
 
@@ -104,5 +107,53 @@ def home(request):
             "forecast_error": forecast_error,
             "statistics": statistics,
             "insights": insights,
+        },
+    )
+
+
+def history_view(request):
+    """Render the historical weather analysis page with optional filters.
+
+    Reads city, start_date, and end_date from GET parameters, validates them,
+    and delegates to analyze_weather_history(). Validation errors are shown
+    without calling the service so invalid filters never produce misleading
+    results.
+    """
+    city = request.GET.get("city", "").strip()
+    start_date_str = request.GET.get("start_date", "").strip()
+    end_date_str = request.GET.get("end_date", "").strip()
+
+    start_date = None
+    end_date = None
+    validation_error = None
+
+    if start_date_str:
+        try:
+            start_date = date.fromisoformat(start_date_str)
+        except ValueError:
+            validation_error = "Invalid start date. Please use YYYY-MM-DD format."
+
+    if end_date_str and not validation_error:
+        try:
+            end_date = date.fromisoformat(end_date_str)
+        except ValueError:
+            validation_error = "Invalid end date. Please use YYYY-MM-DD format."
+
+    if not validation_error and start_date and end_date and start_date > end_date:
+        validation_error = "Start date cannot be later than end date."
+
+    result = None
+    if not validation_error:
+        result = analyze_weather_history(city or None, start_date, end_date)
+
+    return render(
+        request,
+        "weather/history.html",
+        {
+            "city": city,
+            "start_date": start_date_str,
+            "end_date": end_date_str,
+            "result": result,
+            "validation_error": validation_error,
         },
     )
