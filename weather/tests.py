@@ -808,3 +808,123 @@ class AuthenticationFunctionalTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['user'].is_authenticated)
         self.assertEqual(response.context['user'], self.user)
+
+
+class RegistrationTests(TestCase):
+    """Tests for user registration functionality."""
+
+    def setUp(self):
+        self.client = Client()
+        self.User = get_user_model()
+        self.url = reverse("register")
+
+    def test_registration_page_get_returns_200(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "weather/register.html")
+
+    def test_register_url_resolves_by_name(self):
+        self.assertEqual(reverse("register"), "/register/")
+
+    def test_valid_post_creates_one_user(self):
+        user_count_before = self.User.objects.count()
+        response = self.client.post(self.url, {
+            "username": "newuser",
+            "email": "newuser@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("home"))
+        self.assertEqual(self.User.objects.count(), user_count_before + 1)
+
+    def test_saved_password_is_hashed(self):
+        self.client.post(self.url, {
+            "username": "hasheduser",
+            "email": "hashed@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+        user = self.User.objects.get(username="hasheduser")
+        self.assertTrue(user.check_password("StrongPass123!"))
+        self.assertNotEqual(user.password, "StrongPass123!")
+
+    def test_password_mismatch_rejected_no_user(self):
+        user_count_before = self.User.objects.count()
+        response = self.client.post(self.url, {
+            "username": "mismatchuser",
+            "email": "mismatch@example.com",
+            "password1": "StrongPass123!",
+            "password2": "DifferentPass123!",
+        })
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertIn("password2", form.errors)
+        self.assertEqual(self.User.objects.count(), user_count_before)
+
+    def test_weak_password_rejected(self):
+        user_count_before = self.User.objects.count()
+        response = self.client.post(self.url, {
+            "username": "weakuser",
+            "email": "weak@example.com",
+            "password1": "123",
+            "password2": "123",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.User.objects.count(), user_count_before)
+
+    def test_duplicate_username_rejected(self):
+        self.User.objects.create_user(username="existing", password="pass123")
+        user_count_before = self.User.objects.count()
+        response = self.client.post(self.url, {
+            "username": "existing",
+            "email": "other@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertIn("username", form.errors)
+        self.assertEqual(self.User.objects.count(), user_count_before)
+
+    def test_invalid_email_rejected(self):
+        user_count_before = self.User.objects.count()
+        response = self.client.post(self.url, {
+            "username": "emailuser",
+            "email": "not-an-email",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertIn("email", form.errors)
+        self.assertEqual(self.User.objects.count(), user_count_before)
+
+    def test_invalid_submission_renders_form_with_errors(self):
+        response = self.client.post(self.url, {
+            "username": "",
+            "email": "",
+            "password1": "",
+            "password2": "",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required.")
+
+    def test_successful_registration_shows_success_message(self):
+        response = self.client.post(self.url, {
+            "username": "msguser",
+            "email": "msg@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        messages_list = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("Registration successful" in msg for msg in messages_list)
+        )
+
+    def test_authenticated_user_redirected_from_registration(self):
+        self.User.objects.create_user(username="authed", password="pass123")
+        self.client.login(username="authed", password="pass123")
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse("home"))

@@ -1,8 +1,9 @@
 from datetime import date
 
-from django.shortcuts import render
+from django.contrib import messages
+from django.shortcuts import redirect, render
 
-from .forms import CitySearchForm
+from .forms import CitySearchForm, RegistrationForm
 from .models import WeatherData
 from .services import (
     get_weather_data,
@@ -157,3 +158,29 @@ def history_view(request):
             "validation_error": validation_error,
         },
     )
+
+
+def register(request):
+    """Handle user registration.
+
+    Authenticated users are redirected to the home page. On a valid POST,
+    creates a new user (without logging them in) and redirects to the home
+    page with a success message. Invalid submissions re-render the form with
+    field-level errors.
+    """
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = RegistrationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                "Registration successful. Your account has been created.",
+            )
+            return redirect("home")
+    else:
+        form = RegistrationForm()
+
+    return render(request, "weather/register.html", {"form": form})
