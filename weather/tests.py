@@ -1,3 +1,4 @@
+import secrets
 from datetime import date, datetime
 from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase, Client, override_settings
@@ -782,25 +783,35 @@ class AuthenticationFunctionalTests(TestCase):
 
     def setUp(self):
         self.User = get_user_model()
+        self.test_password = secrets.token_urlsafe(32)
         self.user = self.User.objects.create_user(
             username='testuser',
-            password='testpass123',
+            password=self.test_password,
         )
 
     def test_create_user_authenticate_success_and_failure(self):
         # Correct password authenticates successfully.
-        user = authenticate(username='testuser', password='testpass123')
+        user = authenticate(
+            username='testuser',
+            password=self.test_password,
+        )
         self.assertIsNotNone(user)
         self.assertEqual(user, self.user)
 
-        # Incorrect password fails authentication.
-        user = authenticate(username='testuser', password='wrongpassword')
+        # An independently generated incorrect password fails authentication.
+        user = authenticate(
+            username='testuser',
+            password=secrets.token_urlsafe(32),
+        )
         self.assertIsNone(user)
 
     def test_client_login_authenticated_user(self):
         # Test client can log in.
         self.assertTrue(
-            self.client.login(username='testuser', password='testpass123')
+            self.client.login(
+                username='testuser',
+                password=self.test_password,
+            )
         )
 
         # Access a public page and verify request.user is authenticated.

@@ -1,8 +1,10 @@
 from datetime import date
 
-from django.shortcuts import render
+from django.contrib import messages
+from django.contrib.auth import login
+from django.shortcuts import redirect, render
 
-from .forms import CitySearchForm
+from .forms import CitySearchForm, RegistrationForm
 from .models import WeatherData
 from .services import (
     get_weather_data,
@@ -51,6 +53,7 @@ def home(request):
                     wind_speed=weather["wind_speed"],
                     clouds=weather["clouds"],
                 )
+
                 forecast_data = get_forecast_data(city)
 
                 if "error" in forecast_data:
@@ -59,31 +62,44 @@ def home(request):
                 else:
                     parsed_forecast = parse_forecast_data(forecast_data)
 
-                    statistics = calculate_forecast_statistics(parsed_forecast)
-                    insights = generate_weather_insights(weather, parsed_forecast)
+                    statistics = calculate_forecast_statistics(
+                        parsed_forecast
+                    )
+                    insights = generate_weather_insights(
+                        weather, parsed_forecast
+                    )
 
                     forecast = {
                         "city": parsed_forecast["city"],
                         "country": parsed_forecast["country"],
-                        "forecast": summarize_daily_forecast(parsed_forecast),
+                        "forecast": summarize_daily_forecast(
+                            parsed_forecast
+                        ),
                     }
                     forecast_chart = {
-                        "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
-                        "temperatures": [entry["temperature"] for entry in parsed_forecast["forecast"]],
+                        "labels": [
+                            entry["datetime"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
+                        "temperatures": [
+                            entry["temperature"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
                     }
                     humidity_chart = {
-                        "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
-                        "humidities": [entry["humidity"] for entry in parsed_forecast["forecast"]],
+                        "labels": [
+                            entry["datetime"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
+                        "humidities": [
+                            entry["humidity"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
                     }
 
-
-
     history = WeatherData.objects.all()
-
     latest_searches = history[:10]
-
     city_weather = None
-
     searched_city = request.GET.get("city")
 
     if searched_city:
@@ -112,13 +128,7 @@ def home(request):
 
 
 def history_view(request):
-    """Render the historical weather analysis page with optional filters.
-
-    Reads city, start_date, and end_date from GET parameters, validates them,
-    and delegates to analyze_weather_history(). Validation errors are shown
-    without calling the service so invalid filters never produce misleading
-    results.
-    """
+    """Render historical weather analysis with optional filters."""
     city = request.GET.get("city", "").strip()
     start_date_str = request.GET.get("start_date", "").strip()
     end_date_str = request.GET.get("end_date", "").strip()
@@ -131,20 +141,33 @@ def history_view(request):
         try:
             start_date = date.fromisoformat(start_date_str)
         except ValueError:
-            validation_error = "Invalid start date. Please use YYYY-MM-DD format."
+            validation_error = (
+                "Invalid start date. Please use YYYY-MM-DD format."
+            )
 
     if end_date_str and not validation_error:
         try:
             end_date = date.fromisoformat(end_date_str)
         except ValueError:
-            validation_error = "Invalid end date. Please use YYYY-MM-DD format."
+            validation_error = (
+                "Invalid end date. Please use YYYY-MM-DD format."
+            )
 
-    if not validation_error and start_date and end_date and start_date > end_date:
+    if (
+        not validation_error
+        and start_date
+        and end_date
+        and start_date > end_date
+    ):
         validation_error = "Start date cannot be later than end date."
 
     result = None
     if not validation_error:
-        result = analyze_weather_history(city or None, start_date, end_date)
+        result = analyze_weather_history(
+            city or None,
+            start_date,
+            end_date,
+        )
 
     return render(
         request,
@@ -156,4 +179,30 @@ def history_view(request):
             "result": result,
             "validation_error": validation_error,
         },
+    )
+
+
+def register(request):
+    """Register a new user and log them in."""
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = RegistrationForm(request.POST)
+
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(
+                request,
+                "Your account has been created successfully!",
+            )
+            return redirect("home")
+    else:
+        form = RegistrationForm()
+
+    return render(
+        request,
+        "weather/register.html",
+        {"form": form},
     )
