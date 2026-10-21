@@ -1,7 +1,10 @@
 from datetime import date
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm
+from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 
 from .forms import CitySearchForm, RegistrationForm
@@ -206,3 +209,44 @@ def register(request):
         "weather/register.html",
         {"form": form},
     )
+
+def login_view(request):
+    """Authenticate a user and start their session."""
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = AuthenticationForm(request, data=request.POST)
+
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(
+                request,
+                "You have logged in successfully!",
+            )
+
+            next_url = request.POST.get("next") or request.GET.get("next")
+            if next_url and url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                return redirect(next_url)
+
+            return redirect("home")
+    else:
+        form = AuthenticationForm(request)
+
+    return render(
+        request,
+        "weather/login.html",
+        {"form": form},
+    )
+
+@require_POST
+def logout_view(request):
+    """Log out the current user and end their session."""
+    logout(request)
+    messages.success(request, "You have logged out successfully!")
+    return redirect("home")
