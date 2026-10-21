@@ -738,6 +738,12 @@ main {
 .stat-icon--humidity { background: var(--color-humidity-bg); color: var(--color-humidity); }
 .stat-icon--wind { background: var(--color-wind-bg); color: var(--color-wind); }
 
+.stat-icon--insight-trend { background: var(--color-temp-bg); color: var(--color-temp); }
+.stat-icon--insight-warmest { background: var(--color-temp-bg); color: var(--color-temp); }
+.stat-icon--insight-coolest { background: var(--color-humidity-bg); color: var(--color-humidity); }
+.stat-icon--insight-humidity { background: var(--color-humidity-bg); color: var(--color-humidity); }
+.stat-icon--insight-summary { background: var(--color-accent-subtle); color: var(--color-accent); }
+
 .stat-value {
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-bold);
@@ -751,6 +757,12 @@ main {
     color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+}
+
+.stat-datetime {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-xs);
 }
 
 /* ============================================================
