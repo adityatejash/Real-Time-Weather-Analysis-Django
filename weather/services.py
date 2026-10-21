@@ -1,4 +1,6 @@
+import math
 import requests
+from datetime import datetime
 
 from django.conf import settings
 
@@ -163,4 +165,138 @@ def calculate_forecast_statistics(parsed_forecast):
         "min_temperature": min(temperatures),
         "avg_humidity": round(sum(humidities) / len(humidities), 2),
         "avg_wind_speed": round(sum(wind_speeds) / len(wind_speeds), 2),
+    }
+
+
+def _valid_numeric(value):
+    """Return the numeric value if it is a real number, else None.
+
+    Booleans and non-finite values (NaN, infinity) are rejected.
+    """
+    if isinstance(value, bool):
+        return None
+    if not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value):
+        return None
+    return value
+
+
+def _format_timestamp(value):
+    """Format a forecast datetime string, or return 'Time unavailable'."""
+    if not isinstance(value, str):
+        return "Time unavailable"
+    try:
+        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return "Time unavailable"
+    return dt.strftime("%b %d, %I:%M %p")
+
+
+def generate_weather_insights(current_weather, parsed_forecast):
+    """Generate weather insights from current weather and forecast data.
+
+    Returns a dictionary with keys:
+        temperature_trend, warmest_period, coolest_period,
+        humidity_observation, forecast_summary
+    """
+    forecast = []
+    if isinstance(parsed_forecast, dict):
+        forecast = parsed_forecast.get("forecast", [])
+    if not isinstance(forecast, list):
+        forecast = []
+
+    # Collect valid forecast temperatures with their entries, in forecast order.
+    valid_entries = []
+    for entry in forecast:
+        temp = _valid_numeric(entry.get("temperature") if isinstance(entry, dict) else None)
+        if temp is not None:
+            valid_entries.append((entry, temp))
+
+    # Temperature trend: compare first and last valid forecast temperatures.
+    if len(valid_entries) < 2:
+        temperature_trend = "Data unavailable"
+    else:
+        first_temp = valid_entries[0][1]
+        last_temp = valid_entries[-1][1]
+        if last_temp > first_temp:
+            temperature_trend = "Rising"
+        elif last_temp < first_temp:
+            temperature_trend = "Falling"
+        else:
+            temperature_trend = "Stable"
+
+    # Warmest and coolest periods (first match wins on ties).
+    if not valid_entries:
+        warmest_period = None
+        coolest_period = None
+    else:
+        warmest = valid_entries[0]
+        coolest = valid_entries[0]
+        for entry, temp in valid_entries[1:]:
+            if temp > warmest[1]:
+                warmest = (entry, temp)
+            if temp < coolest[1]:
+                coolest = (entry, temp)
+        warmest_period = {
+            "temperature": warmest[1],
+            "datetime": _format_timestamp(warmest[0].get("datetime")),
+        }
+        coolest_period = {
+            "temperature": coolest[1],
+            "datetime": _format_timestamp(coolest[0].get("datetime")),
+        }
+
+    # Humidity observation from current weather.
+    humidity = None
+    if isinstance(current_weather, dict):
+        humidity = _valid_numeric(current_weather.get("humidity"))
+    if humidity is None:
+        humidity_observation = "Data unavailable"
+    elif humidity < 30:
+        humidity_observation = "Low"
+    elif humidity <= 60:
+        humidity_observation = "Comfortable"
+    else:
+        humidity_observation = "High"
+
+    # Forecast summary: most frequent non-empty description (case-insensitive).
+    # Ties resolve to the description that appeared first in the forecast.
+    desc_counts = {}
+    desc_order = []
+    for entry in forecast:
+        if not isinstance(entry, dict):
+            continue
+        desc = entry.get("description")
+        if not isinstance(desc, str):
+            continue
+        desc = desc.strip()
+        if not desc:
+            continue
+        key = desc.lower()
+        if key not in desc_counts:
+            desc_counts[key] = 0
+            desc_order.append(key)
+        desc_counts[key] += 1
+
+    if desc_order:
+        best_key = max(desc_order, key=lambda k: desc_counts[k])
+        # Use the original-cased description from the first occurrence.
+        forecast_summary = None
+        for entry in forecast:
+            if not isinstance(entry, dict):
+                continue
+            d = entry.get("description")
+            if isinstance(d, str) and d.strip().lower() == best_key:
+                forecast_summary = d.strip().title()
+                break
+    else:
+        forecast_summary = "Data unavailable"
+
+    return {
+        "temperature_trend": temperature_trend,
+        "warmest_period": warmest_period,
+        "coolest_period": coolest_period,
+        "humidity_observation": humidity_observation,
+        "forecast_summary": forecast_summary,
     }

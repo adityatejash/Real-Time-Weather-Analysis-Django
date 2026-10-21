@@ -9,6 +9,7 @@ from .services import (
     parse_forecast_data,
     summarize_daily_forecast,
     calculate_forecast_statistics,
+    generate_weather_insights,
 )
 
 
@@ -21,6 +22,7 @@ def home(request):
     forecast_chart = None
     humidity_chart = None
     forecast_error = None
+    insights = None
 
     if request.method == "GET" and request.GET.get("city"):
         form = CitySearchForm(request.GET)
@@ -50,10 +52,12 @@ def home(request):
 
                 if "error" in forecast_data:
                     forecast_error = forecast_data["error"]
+                    insights = generate_weather_insights(weather, {})
                 else:
                     parsed_forecast = parse_forecast_data(forecast_data)
 
                     statistics = calculate_forecast_statistics(parsed_forecast)
+                    insights = generate_weather_insights(weather, parsed_forecast)
 
                     forecast = {
                         "city": parsed_forecast["city"],
@@ -99,5 +103,6 @@ def home(request):
             "humidity_chart": humidity_chart,
             "forecast_error": forecast_error,
             "statistics": statistics,
+            "insights": insights,
         },
     )
