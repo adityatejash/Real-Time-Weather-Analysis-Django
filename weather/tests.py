@@ -874,7 +874,7 @@ class RegistrationTests(TestCase):
         self.assertEqual(self.User.objects.count(), user_count_before)
 
     def test_duplicate_username_rejected(self):
-        self.User.objects.create_user(username="existing", password="pass123")
+        self.User.objects.create_user(username="existing", password="TestOnlyStr0ng!Passw0rd#9")
         user_count_before = self.User.objects.count()
         response = self.client.post(self.url, {
             "username": "existing",
@@ -924,7 +924,7 @@ class RegistrationTests(TestCase):
         )
 
     def test_authenticated_user_redirected_from_registration(self):
-        self.User.objects.create_user(username="authed", password="pass123")
-        self.client.login(username="authed", password="pass123")
+        self.User.objects.create_user(username="authed", password="TestOnlyStr0ng!Passw0rd#9")
+        self.client.login(username="authed", password="TestOnlyStr0ng!Passw0rd#9")
         response = self.client.get(self.url)
         self.assertRedirects(response, reverse("home"))
