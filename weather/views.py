@@ -1,6 +1,13 @@
-from django.shortcuts import render
+from datetime import date
 
-from .forms import CitySearchForm
+from django.contrib import messages
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm
+from django.views.decorators.http import require_POST
+from django.shortcuts import redirect, render
+
+from .forms import CitySearchForm, RegistrationForm
 from .models import WeatherData
 from .services import (
     get_weather_data,
@@ -9,6 +16,8 @@ from .services import (
     parse_forecast_data,
     summarize_daily_forecast,
     calculate_forecast_statistics,
+    generate_weather_insights,
+    analyze_weather_history,
 )
 
 
@@ -21,6 +30,7 @@ def home(request):
     forecast_chart = None
     humidity_chart = None
     forecast_error = None
+    insights = None
 
     if request.method == "GET" and request.GET.get("city"):
         form = CitySearchForm(request.GET)
@@ -46,37 +56,53 @@ def home(request):
                     wind_speed=weather["wind_speed"],
                     clouds=weather["clouds"],
                 )
+
                 forecast_data = get_forecast_data(city)
 
                 if "error" in forecast_data:
                     forecast_error = forecast_data["error"]
+                    insights = generate_weather_insights(weather, {})
                 else:
                     parsed_forecast = parse_forecast_data(forecast_data)
 
-                    statistics = calculate_forecast_statistics(parsed_forecast)
+                    statistics = calculate_forecast_statistics(
+                        parsed_forecast
+                    )
+                    insights = generate_weather_insights(
+                        weather, parsed_forecast
+                    )
 
                     forecast = {
                         "city": parsed_forecast["city"],
                         "country": parsed_forecast["country"],
-                        "forecast": summarize_daily_forecast(parsed_forecast),
+                        "forecast": summarize_daily_forecast(
+                            parsed_forecast
+                        ),
                     }
                     forecast_chart = {
-                        "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
-                        "temperatures": [entry["temperature"] for entry in parsed_forecast["forecast"]],
+                        "labels": [
+                            entry["datetime"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
+                        "temperatures": [
+                            entry["temperature"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
                     }
                     humidity_chart = {
-                        "labels": [entry["datetime"] for entry in parsed_forecast["forecast"]],
-                        "humidities": [entry["humidity"] for entry in parsed_forecast["forecast"]],
+                        "labels": [
+                            entry["datetime"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
+                        "humidities": [
+                            entry["humidity"]
+                            for entry in parsed_forecast["forecast"]
+                        ],
                     }
 
-
-
     history = WeatherData.objects.all()
-
     latest_searches = history[:10]
-
     city_weather = None
-
     searched_city = request.GET.get("city")
 
     if searched_city:
@@ -99,5 +125,128 @@ def home(request):
             "humidity_chart": humidity_chart,
             "forecast_error": forecast_error,
             "statistics": statistics,
+            "insights": insights,
         },
     )
+
+
+def history_view(request):
+    """Render historical weather analysis with optional filters."""
+    city = request.GET.get("city", "").strip()
+    start_date_str = request.GET.get("start_date", "").strip()
+    end_date_str = request.GET.get("end_date", "").strip()
+
+    start_date = None
+    end_date = None
+    validation_error = None
+
+    if start_date_str:
+        try:
+            start_date = date.fromisoformat(start_date_str)
+        except ValueError:
+            validation_error = (
+                "Invalid start date. Please use YYYY-MM-DD format."
+            )
+
+    if end_date_str and not validation_error:
+        try:
+            end_date = date.fromisoformat(end_date_str)
+        except ValueError:
+            validation_error = (
+                "Invalid end date. Please use YYYY-MM-DD format."
+            )
+
+    if (
+        not validation_error
+        and start_date
+        and end_date
+        and start_date > end_date
+    ):
+        validation_error = "Start date cannot be later than end date."
+
+    result = None
+    if not validation_error:
+        result = analyze_weather_history(
+            city or None,
+            start_date,
+            end_date,
+        )
+
+    return render(
+        request,
+        "weather/history.html",
+        {
+            "city": city,
+            "start_date": start_date_str,
+            "end_date": end_date_str,
+            "result": result,
+            "validation_error": validation_error,
+        },
+    )
+
+
+def register(request):
+    """Register a new user and log them in."""
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = RegistrationForm(request.POST)
+
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(
+                request,
+                "Your account has been created successfully!",
+            )
+            return redirect("home")
+    else:
+        form = RegistrationForm()
+
+    return render(
+        request,
+        "weather/register.html",
+        {"form": form},
+    )
+
+def login_view(request):
+    """Authenticate a user and start their session."""
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        form = AuthenticationForm(request, data=request.POST)
+
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(
+                request,
+                "You have logged in successfully!",
+            )
+
+            next_url = request.POST.get("next") or request.GET.get("next")
+            if next_url and url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                return redirect(next_url)
+
+            return redirect("home")
+    else:
+        form = AuthenticationForm(request)
+
+    return render(
+        request,
+        "weather/login.html",
+        {"form": form},
+    )
+
+@require_POST
+def logout_view(request):
+    """Log out the current user and end their session."""
+    logout(request)
+    messages.success(request, "You have logged out successfully!")
+    return redirect("home")
