@@ -3,10 +3,13 @@ from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
+import secrets
 from unittest.mock import patch
 
 from weather.models import WeatherData
 from weather.services import analyze_weather_history, generate_weather_insights
+
+TEST_PASSWORD = secrets.token_urlsafe(16)
 
 
 class WeatherChartTests(TestCase):
@@ -784,12 +787,12 @@ class AuthenticationFunctionalTests(TestCase):
         self.User = get_user_model()
         self.user = self.User.objects.create_user(
             username='testuser',
-            password='testpass123',
+            password=TEST_PASSWORD,
         )
 
     def test_create_user_authenticate_success_and_failure(self):
         # Correct password authenticates successfully.
-        user = authenticate(username='testuser', password='testpass123')
+        user = authenticate(username='testuser', password=TEST_PASSWORD)
         self.assertIsNotNone(user)
         self.assertEqual(user, self.user)
 
@@ -800,7 +803,7 @@ class AuthenticationFunctionalTests(TestCase):
     def test_client_login_authenticated_user(self):
         # Test client can log in.
         self.assertTrue(
-            self.client.login(username='testuser', password='testpass123')
+            self.client.login(username='testuser', password=TEST_PASSWORD)
         )
 
         # Access a public page and verify request.user is authenticated.
@@ -831,8 +834,8 @@ class RegistrationTests(TestCase):
         response = self.client.post(self.url, {
             "username": "newuser",
             "email": "newuser@example.com",
-            "password1": "StrongPass123!",
-            "password2": "StrongPass123!",
+            "password1": TEST_PASSWORD,
+            "password2": TEST_PASSWORD,
         })
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse("home"))
@@ -842,21 +845,26 @@ class RegistrationTests(TestCase):
         self.client.post(self.url, {
             "username": "hasheduser",
             "email": "hashed@example.com",
-            "password1": "StrongPass123!",
-            "password2": "StrongPass123!",
+            "password1": TEST_PASSWORD,
+            "password2": TEST_PASSWORD,
         })
         user = self.User.objects.get(username="hasheduser")
-        self.assertTrue(user.check_password("StrongPass123!"))
-        self.assertNotEqual(user.password, "StrongPass123!")
+        self.assertTrue(user.check_password(TEST_PASSWORD))
+        self.assertNotEqual(user.password, TEST_PASSWORD)
 
     def test_password_mismatch_rejected_no_user(self):
         user_count_before = self.User.objects.count()
+
+        password1 = secrets.token_urlsafe(16)
+        password2 = password1 + "_different"
+
         response = self.client.post(self.url, {
             "username": "mismatchuser",
             "email": "mismatch@example.com",
-            "password1": "StrongPass123!",
-            "password2": "DifferentPass123!",
+            "password1": password1,
+            "password2": password2,
         })
+
         self.assertEqual(response.status_code, 200)
         form = response.context["form"]
         self.assertIn("password2", form.errors)
@@ -874,13 +882,13 @@ class RegistrationTests(TestCase):
         self.assertEqual(self.User.objects.count(), user_count_before)
 
     def test_duplicate_username_rejected(self):
-        self.User.objects.create_user(username="existing", password="TestOnlyStr0ng!Passw0rd#9")
+        self.User.objects.create_user(username="existing", password=TEST_PASSWORD)
         user_count_before = self.User.objects.count()
         response = self.client.post(self.url, {
             "username": "existing",
             "email": "other@example.com",
-            "password1": "StrongPass123!",
-            "password2": "StrongPass123!",
+            "password1": TEST_PASSWORD,
+            "password2": TEST_PASSWORD,
         })
         self.assertEqual(response.status_code, 200)
         form = response.context["form"]
@@ -892,8 +900,8 @@ class RegistrationTests(TestCase):
         response = self.client.post(self.url, {
             "username": "emailuser",
             "email": "not-an-email",
-            "password1": "StrongPass123!",
-            "password2": "StrongPass123!",
+            "password1": TEST_PASSWORD,
+            "password2": TEST_PASSWORD,
         })
         self.assertEqual(response.status_code, 200)
         form = response.context["form"]
@@ -914,8 +922,8 @@ class RegistrationTests(TestCase):
         response = self.client.post(self.url, {
             "username": "msguser",
             "email": "msg@example.com",
-            "password1": "StrongPass123!",
-            "password2": "StrongPass123!",
+            "password1": TEST_PASSWORD,
+            "password2": TEST_PASSWORD,
         }, follow=True)
         self.assertEqual(response.status_code, 200)
         messages_list = [str(m) for m in response.context["messages"]]
@@ -924,7 +932,7 @@ class RegistrationTests(TestCase):
         )
 
     def test_authenticated_user_redirected_from_registration(self):
-        self.User.objects.create_user(username="authed", password="TestOnlyStr0ng!Passw0rd#9")
-        self.client.login(username="authed", password="TestOnlyStr0ng!Passw0rd#9")
+        self.User.objects.create_user(username="authed", password=TEST_PASSWORD)
+        self.client.login(username="authed", password=TEST_PASSWORD)
         response = self.client.get(self.url)
         self.assertRedirects(response, reverse("home"))
