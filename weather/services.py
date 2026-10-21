@@ -1,8 +1,11 @@
 import math
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.utils import timezone
+
+from .models import WeatherData
 
 
 BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -299,4 +302,69 @@ def generate_weather_insights(current_weather, parsed_forecast):
         "coolest_period": coolest_period,
         "humidity_observation": humidity_observation,
         "forecast_summary": forecast_summary,
+    }
+
+
+def analyze_weather_history(city=None, start_date=None, end_date=None):
+    """Analyze historical weather data from saved WeatherData records.
+
+    Filters records by city (case-insensitive) and date range, then computes
+    temperature statistics and chart data from records with valid finite
+    temperatures only. searched_at represents search time, not the weather
+    API observation time.
+    """
+    queryset = WeatherData.objects.all()
+
+    if city and city.strip():
+        queryset = queryset.filter(city__iexact=city.strip())
+
+    if start_date is not None:
+        start_datetime = timezone.make_aware(
+            datetime.combine(start_date, datetime.min.time())
+        )
+        queryset = queryset.filter(searched_at__gte=start_datetime)
+
+    if end_date is not None:
+        end_datetime = timezone.make_aware(
+            datetime.combine(end_date, datetime.min.time())
+        ) + timedelta(days=1)
+        queryset = queryset.filter(searched_at__lt=end_datetime)
+
+    queryset = queryset.order_by("searched_at", "pk")
+
+    city_name = city.strip() if city else ""
+    record_count = queryset.count()
+
+    valid_entries = []
+    for record in queryset:
+        temp = _valid_numeric(record.temperature)
+        if temp is not None:
+            valid_entries.append((record, temp))
+
+    if valid_entries:
+        temperatures = [temp for _, temp in valid_entries]
+        min_temperature = min(temperatures)
+        max_temperature = max(temperatures)
+        avg_temperature = round(sum(temperatures) / len(temperatures), 2)
+    else:
+        min_temperature = None
+        max_temperature = None
+        avg_temperature = None
+
+    chart_labels = []
+    chart_temperatures = []
+    for record, temp in valid_entries:
+        chart_labels.append(record.searched_at.strftime("%b %d, %I:%M %p"))
+        chart_temperatures.append(temp)
+
+    return {
+        "city": city_name,
+        "start_date": start_date,
+        "end_date": end_date,
+        "record_count": record_count,
+        "min_temperature": min_temperature,
+        "max_temperature": max_temperature,
+        "avg_temperature": avg_temperature,
+        "chart_labels": chart_labels,
+        "chart_temperatures": chart_temperatures,
     }

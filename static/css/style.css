@@ -743,6 +743,7 @@ main {
 .stat-icon--insight-coolest { background: var(--color-humidity-bg); color: var(--color-humidity); }
 .stat-icon--insight-humidity { background: var(--color-humidity-bg); color: var(--color-humidity); }
 .stat-icon--insight-summary { background: var(--color-accent-subtle); color: var(--color-accent); }
+.stat-icon--history-count { background: var(--color-accent-subtle); color: var(--color-accent); }
 
 .stat-value {
     font-size: var(--font-size-xl);
