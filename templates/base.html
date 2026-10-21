@@ -55,7 +55,17 @@
                     History
                 </a>
 
-                {% if not user.is_authenticated %}
+                {% if user.is_authenticated %}
+                    <form method="post" action="{% url 'logout' %}" class="nav-auth-form">
+                        {% csrf_token %}
+                        <button type="submit" class="nav-link nav-auth-button">
+                            Logout
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}" class="nav-link">
+                        Login
+                    </a>
                     <a href="{% url 'register' %}" class="nav-link">
                         Register
                     </a>
