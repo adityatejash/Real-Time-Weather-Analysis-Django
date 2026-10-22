@@ -305,7 +305,12 @@ def generate_weather_insights(current_weather, parsed_forecast):
     }
 
 
-def analyze_weather_history(city=None, start_date=None, end_date=None):
+def analyze_weather_history(
+    city=None,
+    start_date=None,
+    end_date=None,
+    user=None,
+):
     """Analyze historical weather data from saved WeatherData records.
 
     Filters records by city (case-insensitive) and date range, then computes
@@ -313,7 +318,7 @@ def analyze_weather_history(city=None, start_date=None, end_date=None):
     temperatures only. searched_at represents search time, not the weather
     API observation time.
     """
-    queryset = WeatherData.objects.all()
+    queryset = WeatherData.objects.filter(user=user) if user is not None else WeatherData.objects.none()
 
     if city and city.strip():
         queryset = queryset.filter(city__iexact=city.strip())
