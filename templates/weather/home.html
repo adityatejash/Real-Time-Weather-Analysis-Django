@@ -6,7 +6,16 @@ Weather Dashboard — WeatherLab
 
 {% block content %}
 
+
 <div class="dashboard">
+
+    {% if user.is_authenticated %}
+        <div class="favorites-navigation">
+            <a href="{% url 'favorites' %}" class="btn">
+                My Favorite Cities
+            </a>
+        </div>
+    {% endif %}
 
     <!-- Hero Header -->
     <section class="hero" aria-labelledby="dashboard-heading">
