@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 
 from .forms import CitySearchForm, RegistrationForm
-from .models import WeatherData
+from .models import WeatherData, FavoriteCity
 from .services import (
     get_weather_data,
     parse_weather_data,
@@ -257,4 +257,32 @@ def logout_view(request):
     """Log out the current user and end their session."""
     logout(request)
     messages.success(request, "You have logged out successfully!")
+    return redirect("home")
+
+
+@login_required(login_url="login")
+@require_POST
+def add_favorite_city(request):
+    city = request.POST.get("city", "").strip()
+    country = request.POST.get("country", "").strip().upper()
+
+    if not city:
+        messages.error(request, "Please provide a valid city.")
+        return redirect("home")
+
+    if len(city) > 100 or len(country) > 2:
+        messages.error(request, "Invalid city or country.")
+        return redirect("home")
+
+    favorite, created = FavoriteCity.objects.get_or_create(
+        user=request.user,
+        city=city,
+        country=country,
+    )
+
+    if created:
+        messages.success(request, f"{city} added to your favorites.")
+    else:
+        messages.info(request, f"{city} is already in your favorites.")
+
     return redirect("home")

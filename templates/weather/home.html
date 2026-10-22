@@ -74,6 +74,22 @@ Weather Dashboard — WeatherLab
                             <span class="temp-feels">Feels like {{ weather.feels_like }}°C</span>
                         </div>
                     </div>
+
+                    {% if user.is_authenticated %}
+                        <form method="post" action="{% url 'add_favorite_city' %}" class="favorite-city-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="city" value="{{ weather.city }}">
+                            <input type="hidden" name="country" value="{{ weather.country }}">
+                            <button type="submit" class="btn btn-primary">
+                                Add to Favorites
+                            </button>
+                        </form>
+                    {% else %}
+                        <p class="favorite-login-prompt">
+                            <a href="{% url 'login' %}">Log in</a> to save this city to your favorites.
+                        </p>
+                    {% endif %}
+
                 </div>
 
                 <!-- Metric tiles -->
