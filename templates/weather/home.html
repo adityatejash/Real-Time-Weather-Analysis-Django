@@ -33,6 +33,26 @@ Weather Dashboard — WeatherLab
                             {% endif %}
                         </div>
 
+                        <div class="favorite-actions">
+                            <a
+                                href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
+                                class="btn btn-primary"
+                            >
+                                Open Weather
+                            </a>
+
+                            <form
+                                method="post"
+                                action="{% url 'remove_favorite_city' favorite.id %}"
+                            >
+                                {% csrf_token %}
+                                <button type="submit" class="btn">
+                                    Remove
+                                </button>
+                            </form>
+                        </div>
+
+
                         <form
                             method="post"
                             action="{% url 'remove_favorite_city' favorite.id %}"
