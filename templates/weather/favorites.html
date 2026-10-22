@@ -1,0 +1,57 @@
+
+{% extends "base.html" %}
+
+{% block title %}My Favorite Cities — WeatherLab{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <section class="hero">
+        <h1>My Favorite Cities</h1>
+        <p>Manage your saved weather locations.</p>
+    </section>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="message" role="status">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <section class="section">
+        <div class="section-body">
+            {% for favorite in favorites %}
+                <div class="favorite-card">
+                    <div>
+                        <h3>{{ favorite.city }}</h3>
+                        {% if favorite.country %}
+                            <p>{{ favorite.country }}</p>
+                        {% endif %}
+                    </div>
+
+                    <form
+                        method="post"
+                        action="{% url 'remove_favorite_city' favorite.id %}"
+                    >
+                        {% csrf_token %}
+                        <button type="submit" class="btn">
+                            Remove
+                        </button>
+                    </form>
+                </div>
+            {% empty %}
+                <div class="empty-state">
+                    <p>You haven't saved any favorite cities yet.</p>
+                    <a href="{% url 'home' %}" class="btn">
+                        Search for a City
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <a href="{% url 'home' %}" class="btn">
+        Back to Weather Dashboard
+    </a>
+</div>
+{% endblock %}

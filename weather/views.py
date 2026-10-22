@@ -4,9 +4,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth import login, logout
+from .models import FavoriteCity
 from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.http import require_POST
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CitySearchForm, RegistrationForm
 from .models import WeatherData, FavoriteCity
@@ -259,6 +260,17 @@ def logout_view(request):
     messages.success(request, "You have logged out successfully!")
     return redirect("home")
 
+@login_required(login_url="login")
+def favorites_view(request):
+    favorites = FavoriteCity.objects.filter(
+        user=request.user
+    ).order_by("city")
+
+    return render(
+        request,
+        "weather/favorites.html",
+        {"favorites": favorites},
+    )
 
 @login_required(login_url="login")
 @require_POST
@@ -286,3 +298,22 @@ def add_favorite_city(request):
         messages.info(request, f"{city} is already in your favorites.")
 
     return redirect("home")
+
+@login_required(login_url="login")
+@require_POST
+def remove_favorite_city(request, favorite_id):
+    favorite = get_object_or_404(
+        FavoriteCity,
+        id=favorite_id,
+        user=request.user,
+    )
+
+    city = favorite.city
+    favorite.delete()
+
+    messages.success(
+        request,
+        f"{city} removed from your favorites.",
+    )
+
+    return redirect("favorites")
