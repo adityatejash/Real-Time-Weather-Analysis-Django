@@ -476,27 +476,36 @@ class WeatherInsightsTests(TestCase):
 @override_settings(TIME_ZONE="UTC")
 class WeatherHistoryAnalysisTests(TestCase):
     def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="history_analysis_user",
+            password=secrets.token_urlsafe(32),
+        )
         self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
         self.t2 = timezone.make_aware(datetime(2026, 1, 15, 14, 0, 0))
         self.t3 = timezone.make_aware(datetime(2026, 1, 16, 10, 0, 0))
         self.t4 = timezone.make_aware(datetime(2026, 1, 16, 16, 0, 0))
 
         r1 = WeatherData.objects.create(
+            user=self.user,
             city="London", country="GB", temperature=10.0, feels_like=9.0,
             humidity=60, pressure=1015, description="clear sky",
             wind_speed=3.5, clouds=20,
         )
         r2 = WeatherData.objects.create(
+            user=self.user,
             city="London", country="GB", temperature=15.0, feels_like=14.0,
             humidity=55, pressure=1013, description="partly cloudy",
             wind_speed=4.0, clouds=40,
         )
         r3 = WeatherData.objects.create(
+            user=self.user,
             city="london", country="GB", temperature=20.0, feels_like=19.0,
             humidity=50, pressure=1010, description="rain",
             wind_speed=5.0, clouds=90,
         )
         r4 = WeatherData.objects.create(
+            user=self.user,
             city="Paris", country="FR", temperature=5.0, feels_like=4.0,
             humidity=70, pressure=1020, description="snow",
             wind_speed=2.0, clouds=100,
@@ -510,7 +519,7 @@ class WeatherHistoryAnalysisTests(TestCase):
         WeatherData.objects.filter(pk=r4.pk).update(searched_at=self.t4)
 
     def test_multiple_records_statistics_and_chart(self):
-        result = analyze_weather_history()
+        result = analyze_weather_history(user=self.user)
         self.assertEqual(result["city"], "")
         self.assertIsNone(result["start_date"])
         self.assertIsNone(result["end_date"])
@@ -525,7 +534,7 @@ class WeatherHistoryAnalysisTests(TestCase):
         self.assertEqual(result["chart_temperatures"], [10.0, 15.0, 20.0, 5.0])
 
     def test_city_filtering_case_insensitive(self):
-        result = analyze_weather_history(city="LONDON")
+        result = analyze_weather_history(city="LONDON", user=self.user)
         self.assertEqual(result["city"], "LONDON")
         self.assertEqual(result["record_count"], 3)
         self.assertEqual(result["min_temperature"], 10.0)
@@ -533,30 +542,45 @@ class WeatherHistoryAnalysisTests(TestCase):
         self.assertEqual(result["avg_temperature"], 15.0)
 
     def test_city_filtering_trims_whitespace(self):
-        result = analyze_weather_history(city="  london  ")
+        result = analyze_weather_history(city="  london  ", user=self.user)
         self.assertEqual(result["city"], "london")
         self.assertEqual(result["record_count"], 3)
 
     def test_start_date_filtering_includes_start_date(self):
-        result = analyze_weather_history(start_date=date(2026, 1, 15))
+        result = analyze_weather_history(
+            start_date=date(2026, 1, 15),
+            user=self.user,
+        )
         self.assertEqual(result["record_count"], 4)
         self.assertEqual(result["start_date"], date(2026, 1, 15))
 
     def test_start_date_filtering_excludes_before_start(self):
-        result = analyze_weather_history(start_date=date(2026, 1, 16))
+        result = analyze_weather_history(
+            start_date=date(2026, 1, 16),
+            user=self.user,
+        )
         self.assertEqual(result["record_count"], 2)
 
     def test_end_date_filtering_includes_entire_end_date(self):
-        result = analyze_weather_history(end_date=date(2026, 1, 15))
+        result = analyze_weather_history(
+            end_date=date(2026, 1, 15),
+            user=self.user,
+        )
         self.assertEqual(result["record_count"], 2)
 
     def test_end_date_filtering_excludes_after_end(self):
-        result = analyze_weather_history(end_date=date(2026, 1, 16))
+        result = analyze_weather_history(
+            end_date=date(2026, 1, 16),
+            user=self.user,
+        )
         self.assertEqual(result["record_count"], 4)
 
     def test_combined_city_and_date_filtering(self):
         result = analyze_weather_history(
-            city="Paris", start_date=date(2026, 1, 15), end_date=date(2026, 1, 16)
+            city="Paris",
+            start_date=date(2026, 1, 15),
+            end_date=date(2026, 1, 16),
+            user=self.user,
         )
         self.assertEqual(result["city"], "Paris")
         self.assertEqual(result["record_count"], 1)
@@ -565,7 +589,7 @@ class WeatherHistoryAnalysisTests(TestCase):
         self.assertEqual(result["avg_temperature"], 5.0)
 
     def test_empty_results(self):
-        result = analyze_weather_history(city="Berlin")
+        result = analyze_weather_history(city="Berlin", user=self.user)
         self.assertEqual(result["city"], "Berlin")
         self.assertEqual(result["record_count"], 0)
         self.assertIsNone(result["min_temperature"])
@@ -578,6 +602,14 @@ class WeatherHistoryAnalysisTests(TestCase):
 class WeatherHistoryViewTests(TestCase):
     def setUp(self):
         self.client = Client()
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="history_view_user",
+            password=secrets.token_urlsafe(32),
+        )
+        self.client.force_login(self.user)
+
         self.url = reverse("weather_history")
 
         self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
@@ -586,21 +618,25 @@ class WeatherHistoryViewTests(TestCase):
         self.t4 = timezone.make_aware(datetime(2026, 1, 16, 16, 0, 0))
 
         r1 = WeatherData.objects.create(
+            user=self.user,
             city="London", country="GB", temperature=10.0, feels_like=9.0,
             humidity=60, pressure=1015, description="clear sky",
             wind_speed=3.5, clouds=20,
         )
         r2 = WeatherData.objects.create(
+            user=self.user,
             city="London", country="GB", temperature=15.0, feels_like=14.0,
             humidity=55, pressure=1013, description="partly cloudy",
             wind_speed=4.0, clouds=40,
         )
         r3 = WeatherData.objects.create(
+            user=self.user,
             city="london", country="GB", temperature=20.0, feels_like=19.0,
             humidity=50, pressure=1010, description="rain",
             wind_speed=5.0, clouds=90,
         )
         r4 = WeatherData.objects.create(
+            user=self.user,
             city="Paris", country="FR", temperature=5.0, feels_like=4.0,
             humidity=70, pressure=1020, description="snow",
             wind_speed=2.0, clouds=100,
@@ -638,7 +674,12 @@ class WeatherHistoryViewTests(TestCase):
                 {"city": "London", "start_date": "2026-01-15", "end_date": "2026-01-16"},
             )
         self.assertEqual(response.status_code, 200)
-        mock_service.assert_called_once_with("London", date(2026, 1, 15), date(2026, 1, 16))
+        mock_service.assert_called_once_with(
+    "London",
+    date(2026, 1, 15),
+    date(2026, 1, 16),
+    user=self.user,
+)
 
     def test_valid_filters_appear_in_response(self):
         response = self.client.get(
@@ -691,6 +732,14 @@ class WeatherHistoryViewTests(TestCase):
         self.assertIsNotNone(result["avg_temperature"])
         self.assertGreater(len(result["chart_labels"]), 0)
         self.assertGreater(len(result["chart_temperatures"]), 0)
+
+    def test_anonymous_user_redirected_to_login(self):
+        self.client.logout()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
 
 
 class AuthenticationConfigurationTests(TestCase):

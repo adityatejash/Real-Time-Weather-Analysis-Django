@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
@@ -46,6 +47,7 @@ def home(request):
                 weather = parse_weather_data(data)
 
                 WeatherData.objects.create(
+                    user=request.user if request.user.is_authenticated else None,
                     city=weather["city"],
                     country=weather["country"],
                     temperature=weather["temperature"],
@@ -100,13 +102,17 @@ def home(request):
                         ],
                     }
 
-    history = WeatherData.objects.all()
+    if request.user.is_authenticated:
+        history = WeatherData.objects.filter(user=request.user)
+    else:
+        history = WeatherData.objects.none()
+
     latest_searches = history[:10]
     city_weather = None
     searched_city = request.GET.get("city")
 
-    if searched_city:
-        city_weather = WeatherData.objects.filter(
+    if searched_city and request.user.is_authenticated:
+        city_weather = history.filter(
             city__iexact=searched_city
         )
 
@@ -130,6 +136,7 @@ def home(request):
     )
 
 
+@login_required(login_url="login")
 def history_view(request):
     """Render historical weather analysis with optional filters."""
     city = request.GET.get("city", "").strip()
@@ -170,6 +177,7 @@ def history_view(request):
             city or None,
             start_date,
             end_date,
+            user=request.user,
         )
 
     return render(

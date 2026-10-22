@@ -1,8 +1,16 @@
+from django.conf import settings
 from django.db import models
 
 # Create your models here.
 
 class WeatherData(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="weather_searches",
+        null=True,
+        blank=True,
+    )
     city = models.CharField(max_length=100, db_index=True)
     country = models.CharField(max_length=2)
     temperature = models.FloatField()
