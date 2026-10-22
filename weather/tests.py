@@ -868,3 +868,100 @@ class AuthenticationFunctionalTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['user'].is_authenticated)
         self.assertEqual(response.context['user'], self.user)
+
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase, Client
+from unittest.mock import patch
+
+
+class WeatherSearchOwnershipTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+
+        self.user_a = User.objects.create_user(
+            username="search_user_a",
+            password="TestPassword123!",
+        )
+        self.user_b = User.objects.create_user(
+            username="search_user_b",
+            password="TestPassword123!",
+        )
+        self.client = Client()
+
+    @patch("weather.views.get_weather_data")
+    def test_saved_search_is_associated_with_logged_in_user(
+        self, mock_get_weather_data
+    ):
+        # Update the mock response to match the structure expected
+        # by your existing home() view and parse_weather_data().
+        mock_get_weather_data.return_value = {
+            "name": "London",
+            "sys": {"country": "GB"},
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "weather": [
+                {
+                    "description": "clear sky",
+                    "icon": "01d",
+                }
+            ],
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+        }
+
+        self.client.force_login(self.user_a)
+
+        # Adapt the URL and request method to your home() view.
+        response = self.client.get("/", {"city": "London"})
+
+        self.assertEqual(response.status_code, 200)
+
+        from weather.models import WeatherData
+
+        saved_search = WeatherData.objects.filter(city__iexact="London").latest(
+            "searched_at"
+        )
+        self.assertEqual(saved_search.user, self.user_a)
+
+    def test_different_users_have_separate_saved_searches(self):
+        from weather.models import WeatherData
+
+        search_a = WeatherData.objects.create(
+            user=self.user_a,
+            city="London",
+            country="GB",
+            temperature=15.0,
+            feels_like=14.0,
+            humidity=60,
+            pressure=1015,
+            description="clear sky",
+            wind_speed=3.5,
+            clouds=20,
+        )
+
+        search_b = WeatherData.objects.create(
+            user=self.user_b,
+            city="Tokyo",
+            country="JP",
+            temperature=20.0,
+            feels_like=19.0,
+            humidity=50,
+            pressure=1010,
+            description="clear sky",
+            wind_speed=2.5,
+            clouds=10,
+        )
+
+        self.assertEqual(
+            list(WeatherData.objects.filter(user=self.user_a)),
+            [search_a],
+        )
+        self.assertEqual(
+            list(WeatherData.objects.filter(user=self.user_b)),
+            [search_b],
+        )
