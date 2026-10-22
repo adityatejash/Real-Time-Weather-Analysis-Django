@@ -103,10 +103,16 @@ def home(request):
                         ],
                     }
 
+
     if request.user.is_authenticated:
         history = WeatherData.objects.filter(user=request.user)
+        favorites = FavoriteCity.objects.filter(
+            user=request.user
+        ).order_by("city")
     else:
         history = WeatherData.objects.none()
+        favorites = FavoriteCity.objects.none()
+
 
     latest_searches = history[:10]
     city_weather = None
@@ -133,6 +139,7 @@ def home(request):
             "forecast_error": forecast_error,
             "statistics": statistics,
             "insights": insights,
+            "favorites": favorites,
         },
     )
 

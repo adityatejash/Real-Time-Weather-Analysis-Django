@@ -9,6 +9,57 @@ Weather Dashboard — WeatherLab
 
 <div class="dashboard">
 
+    <!-- Favorites Section -->
+    <section class="section favorites-section">
+        <div class="section-header">
+            <div>
+                <h2>My Favorite Cities</h2>
+                <p>Your saved weather locations</p>
+            </div>
+
+            <a href="{% url 'favorites' %}" class="btn">
+                Manage Favorites
+            </a>
+        </div>
+
+        <div class="section-body">
+            {% if user.is_authenticated %}
+                {% for favorite in favorites %}
+                    <div class="favorite-card">
+                        <div>
+                            <h3>{{ favorite.city }}</h3>
+                            {% if favorite.country %}
+                                <p>{{ favorite.country }}</p>
+                            {% endif %}
+                        </div>
+
+                        <form
+                            method="post"
+                            action="{% url 'remove_favorite_city' favorite.id %}"
+                        >
+                            {% csrf_token %}
+                            <button type="submit" class="btn">
+                                Remove
+                            </button>
+                        </form>
+                    </div>
+                {% empty %}
+                    <div class="empty-state">
+                        <p>You haven't saved any favorite cities yet.</p>
+                        <p>Search for a city and add it to your favorites.</p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>Log in to save and view your favorite cities.</p>
+                    <a href="{% url 'login' %}" class="btn">
+                        Log In
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
     {% if user.is_authenticated %}
         <div class="favorites-navigation">
             <a href="{% url 'favorites' %}" class="btn">
