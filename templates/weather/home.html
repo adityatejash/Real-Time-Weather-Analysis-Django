@@ -6,110 +6,23 @@ Weather Dashboard — WeatherLab
 
 {% block content %}
 
-
 <div class="dashboard">
 
-    <!-- Favorites Section -->
-    <section class="section favorites-section">
-        <div class="section-header">
-            <div>
-                <h2>My Favorite Cities</h2>
-                <p>Your saved weather locations</p>
-            </div>
-
-            <a href="{% url 'favorites' %}" class="btn">
-                Manage Favorites
-            </a>
-        </div>
-
-        <div class="section-body">
-            {% if user.is_authenticated %}
-                {% for favorite in favorites %}
-                    <div class="favorite-card">
-                        <div>
-                            <h3>{{ favorite.city }}</h3>
-                            {% if favorite.country %}
-                                <p>{{ favorite.country }}</p>
-                            {% endif %}
-                        </div>
-
-                        <div class="favorite-actions">
-                            <a
-                                href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
-                                class="btn btn-primary"
-                            >
-                                Open Weather
-                            </a>
-
-                            <form
-                                method="post"
-                                action="{% url 'remove_favorite_city' favorite.id %}"
-                            >
-                                {% csrf_token %}
-                                <button type="submit" class="btn">
-                                    Remove
-                                </button>
-                            </form>
-                        </div>
-
-
-                        <form
-                            method="post"
-                            action="{% url 'remove_favorite_city' favorite.id %}"
-                        >
-                            {% csrf_token %}
-                            <button type="submit" class="btn">
-                                Remove
-                            </button>
-                        </form>
-                    </div>
-                {% empty %}
-                    <div class="empty-state">
-                        <p>You haven't saved any favorite cities yet.</p>
-                        <p>Search for a city and add it to your favorites.</p>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <p>Log in to save and view your favorite cities.</p>
-                    <a href="{% url 'login' %}" class="btn">
-                        Log In
-                    </a>
-                </div>
-            {% endif %}
-        </div>
-    </section>
-
-    {% if user.is_authenticated %}
-        <div class="favorites-navigation">
-            <a href="{% url 'favorites' %}" class="btn">
-                My Favorite Cities
-            </a>
-        </div>
-    {% endif %}
-
-    <!-- Hero Header -->
-    <section class="hero" aria-labelledby="dashboard-heading">
-        <h1 id="dashboard-heading">Weather Dashboard</h1>
-        <p>Real-time weather analysis, forecasts &amp; trends</p>
-    </section>
-
-
     <!-- City Search -->
-    <section class="search-section" aria-label="City search">
-        <form method="get" class="search-form" id="citySearchForm">
-            {{ form.as_p }}
-
-            <button type="submit" class="btn" id="searchButton">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"/>
-                    <path d="m21 21-4.3-4.3"/>
-                </svg>
-                Search
-            </button>
-        </form>
+    <section class="section panel" aria-label="City search">
+        <div class="section-body">
+            <form method="get" class="search-form" id="citySearchForm">
+                {{ form.as_p }}
+                <button type="submit" class="btn btn--primary" id="searchButton">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                    </svg>
+                    Search
+                </button>
+            </form>
+        </div>
     </section>
-
 
     <!-- Error Message -->
     {% if error %}
@@ -118,49 +31,20 @@ Weather Dashboard — WeatherLab
         </div>
     {% endif %}
 
-
     <!-- Current Weather -->
-    <section class="section" aria-labelledby="current-weather-heading">
-        <div class="section-header">
-            <h2 id="current-weather-heading">
-                <span class="section-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/><line x1="4.22" x2="5.64" y1="4.22" y2="5.64"/><line x1="18.36" x2="19.78" y1="18.36" y2="19.78"/><line x1="1" x2="3" y1="12" y2="12"/><line x1="21" x2="23" y1="12" y2="12"/><line x1="4.22" x2="5.64" y1="19.78" y2="18.36"/><line x1="18.36" x2="19.78" y1="5.64" y2="4.22"/>
-                    </svg>
-                </span>
-                Current Weather
-            </h2>
-        </div>
-
+    {% if weather %}
+    <section class="section panel" aria-labelledby="current-weather-heading">
         <div class="section-body">
-            {% if weather %}
+            <div class="section-head section-head--split">
+                <h2 id="current-weather-heading" class="section-title">Current Weather</h2>
 
-                <!-- Weather hero: icon + temp + location -->
-                <div class="weather-hero">
-                    <div class="weather-hero-icon">
-                        <img
-                            src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
-                            alt="{{ weather.description }}"
-                            width="100"
-                            height="100"
-                        >
-                    </div>
-
-                    <div class="weather-hero-info">
-                        <h3 class="weather-hero-location">{{ weather.city }}, {{ weather.country }}</h3>
-                        <p class="weather-hero-description">{{ weather.description|title }}</p>
-                        <div class="weather-hero-temp">
-                            <span class="temp-value">{{ weather.temperature }}°</span>
-                            <span class="temp-feels">Feels like {{ weather.feels_like }}°C</span>
-                        </div>
-                    </div>
-
+                <div class="weather-hero-action">
                     {% if user.is_authenticated %}
                         <form method="post" action="{% url 'add_favorite_city' %}" class="favorite-city-form">
                             {% csrf_token %}
                             <input type="hidden" name="city" value="{{ weather.city }}">
                             <input type="hidden" name="country" value="{{ weather.country }}">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn--primary btn--compact">
                                 Add to Favorites
                             </button>
                         </form>
@@ -169,88 +53,112 @@ Weather Dashboard — WeatherLab
                             <a href="{% url 'login' %}">Log in</a> to save this city to your favorites.
                         </p>
                     {% endif %}
-
                 </div>
+            </div>
 
-                <!-- Metric tiles -->
-                <div class="metrics-grid">
-                    <div class="metric-tile">
-                        <div class="metric-icon metric-icon--humidity" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
-                            </svg>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-label">Humidity</div>
-                            <div class="metric-value">{{ weather.humidity }}%</div>
-                        </div>
-                    </div>
-
-                    <div class="metric-tile">
-                        <div class="metric-icon metric-icon--pressure" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><circle cx="12" cy="14" r="4"/>
-                            </svg>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-label">Pressure</div>
-                            <div class="metric-value">{{ weather.pressure }} hPa</div>
-                        </div>
-                    </div>
-
-                    <div class="metric-tile">
-                        <div class="metric-icon metric-icon--wind" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
-                            </svg>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-label">Wind Speed</div>
-                            <div class="metric-value">{{ weather.wind_speed }} m/s</div>
-                        </div>
-                    </div>
-
-                    <div class="metric-tile">
-                        <div class="metric-icon metric-icon--clouds" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-                            </svg>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-label">Cloudiness</div>
-                            <div class="metric-value">{{ weather.clouds }}%</div>
-                        </div>
+            <div class="weather-hero">
+                <div class="weather-hero-info">
+                    <div class="weather-hero-location">{{ weather.city }}, {{ weather.country }}</div>
+                    <p class="weather-hero-description">{{ weather.description|title }}</p>
+                    <div class="weather-hero-temp">
+                        <span class="temp-value">{{ weather.temperature }}°</span>
+                        <span class="temp-feels">Feels like {{ weather.feels_like }}°C</span>
                     </div>
                 </div>
 
-            {% else %}
+                <div class="weather-hero-icon">
+                    <img
+                        src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
+                        alt="{{ weather.description }}"
+                        width="96"
+                        height="96"
+                    >
+                </div>
+            </div>
 
-                <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-                    </svg>
-                    <p>Search for a city to view current weather.</p>
+            <!-- Metric tiles -->
+            <div class="metrics-grid">
+                <div class="metric-tile">
+                    <div class="metric-icon metric-icon--live" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="4.93" y1="4.93" y2="4.93"/><line x1="19.07" x2="19.07" y1="19.07" y2="19.07"/><line x1="2.29" x2="2.29" y1="2.29" y2="2.29"/><line x1="21.71" x2="21.71" y1="21.71" y2="21.71"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Temperature</div>
+                        <div class="metric-value">{{ weather.temperature }}°C</div>
+                    </div>
                 </div>
 
-            {% endif %}
+                <div class="metric-tile">
+                    <div class="metric-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Humidity</div>
+                        <div class="metric-value">{{ weather.humidity }}%</div>
+                    </div>
+                </div>
+
+                <div class="metric-tile">
+                    <div class="metric-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><circle cx="12" cy="14" r="4"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Pressure</div>
+                        <div class="metric-value">{{ weather.pressure }} hPa</div>
+                    </div>
+                </div>
+
+                <div class="metric-tile">
+                    <div class="metric-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Wind Speed</div>
+                        <div class="metric-value">{{ weather.wind_speed }} m/s</div>
+                    </div>
+                </div>
+
+                <div class="metric-tile">
+                    <div class="metric-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-label">Cloudiness</div>
+                        <div class="metric-value">{{ weather.clouds }}%</div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </section>
-
+    {% else %}
+    <section class="section panel">
+        <div class="section-body">
+            <h2 class="section-title">Current Weather</h2>
+            <div class="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="4.93" y1="4.93" y2="4.93"/><line x1="19.07" x2="19.07" y1="19.07" y2="19.07"/><line x1="2.29" x2="2.29" y1="2.29" y2="2.29"/><line x1="21.71" x2="21.71" y1="21.71" y2="21.71"/>
+                </svg>
+                <p>Search for a city to view current weather.</p>
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
     <!-- Forecast -->
-    <section class="section" aria-labelledby="forecast-heading">
-        <div class="section-header">
-            <h2 id="forecast-heading">
-                <span class="section-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
-                    </svg>
-                </span>
-                Forecast
-            </h2>
-        </div>
-
+    <section class="section panel" aria-labelledby="forecast-heading">
         <div class="section-body">
+            <h2 id="forecast-heading" class="section-title">Forecast</h2>
             {% if forecast %}
                 <div class="forecast-grid">
                     {% for entry in forecast.forecast %}
@@ -260,8 +168,8 @@ Weather Dashboard — WeatherLab
                                 src="https://openweathermap.org/img/wn/{{ entry.icon }}@2x.png"
                                 alt="{{ entry.description }}"
                                 class="forecast-icon"
-                                width="56"
-                                height="56"
+                                width="48"
+                                height="48"
                             >
                             <div class="forecast-description">{{ entry.description|title }}</div>
                             <div class="forecast-temps">
@@ -285,194 +193,137 @@ Weather Dashboard — WeatherLab
         </div>
     </section>
 
-
     <!-- Weather Statistics -->
-    <section class="section" aria-labelledby="stats-heading">
-        <div class="section-header">
-            <h2 id="stats-heading">
-                <span class="section-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
-                    </svg>
-                </span>
-                Weather Statistics
-            </h2>
-        </div>
-
+    {% if statistics %}
+    <section class="section panel" aria-labelledby="stats-heading">
         <div class="section-body">
-            {% if statistics %}
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--temp-avg" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ statistics.avg_temperature }}°C</div>
-                        <div class="stat-label">Avg Temperature</div>
+            <h2 id="stats-heading" class="section-title">Weather Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
+                        </svg>
                     </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--temp-max" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/><line x1="20" x2="20" y1="7" y2="11"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ statistics.max_temperature }}°C</div>
-                        <div class="stat-label">Max Temperature</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--temp-min" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ statistics.min_temperature }}°C</div>
-                        <div class="stat-label">Min Temperature</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--humidity" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ statistics.avg_humidity }}%</div>
-                        <div class="stat-label">Avg Humidity</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--wind" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ statistics.avg_wind_speed }} m/s</div>
-                        <div class="stat-label">Avg Wind Speed</div>
-                    </div>
+                    <div class="stat-value">{{ statistics.avg_temperature }}°C</div>
+                    <div class="stat-label">Avg Temperature</div>
                 </div>
-            {% else %}
-                <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
-                    </svg>
-                    <p>Search for a city to view weather statistics.</p>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/><line x1="20" x2="20" y1="7" y2="11"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">{{ statistics.max_temperature }}°C</div>
+                    <div class="stat-label">Max Temperature</div>
                 </div>
-            {% endif %}
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">{{ statistics.min_temperature }}°C</div>
+                    <div class="stat-label">Min Temperature</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">{{ statistics.avg_humidity }}%</div>
+                    <div class="stat-label">Avg Humidity</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">{{ statistics.avg_wind_speed }} m/s</div>
+                    <div class="stat-label">Avg Wind Speed</div>
+                </div>
+            </div>
         </div>
     </section>
-
+    {% endif %}
 
     <!-- Weather Insights -->
-    <section class="section" aria-labelledby="insights-heading">
-        <div class="section-header">
-            <h2 id="insights-heading">
-                <span class="section-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/>
-                        <path d="M2 12l10 5 10-5"/>
-                    </svg>
-                </span>
-                Weather Insights
-            </h2>
-        </div>
-
+    {% if insights %}
+    <section class="section panel" aria-labelledby="insights-heading">
         <div class="section-body">
-            {% if insights %}
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--insight-trend" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ insights.temperature_trend }}</div>
-                        <div class="stat-label">Temperature Trend</div>
+            <h2 id="insights-heading" class="section-title">Weather Insights</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--live" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
                     </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--insight-warmest" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/>
-                            </svg>
-                        </div>
-                        {% if insights.warmest_period %}
-                            <div class="stat-value">{{ insights.warmest_period.temperature }}°C</div>
-                            <div class="stat-label">Warmest Period</div>
-                            <div class="stat-datetime">{{ insights.warmest_period.datetime }}</div>
-                        {% else %}
-                            <div class="stat-value">Data unavailable</div>
-                            <div class="stat-label">Warmest Period</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--insight-coolest" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                            </svg>
-                        </div>
-                        {% if insights.coolest_period %}
-                            <div class="stat-value">{{ insights.coolest_period.temperature }}°C</div>
-                            <div class="stat-label">Coolest Period</div>
-                            <div class="stat-datetime">{{ insights.coolest_period.datetime }}</div>
-                        {% else %}
-                            <div class="stat-value">Data unavailable</div>
-                            <div class="stat-label">Coolest Period</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--insight-humidity" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ insights.humidity_observation }}</div>
-                        <div class="stat-label">Humidity Observation</div>
-                    </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon stat-icon--insight-summary" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-value">{{ insights.forecast_summary }}</div>
-                        <div class="stat-label">Forecast Summary</div>
-                    </div>
+                    <div class="stat-value">{{ insights.temperature_trend }}</div>
+                    <div class="stat-label">Temperature Trend</div>
                 </div>
-            {% else %}
-                <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                    </svg>
-                    <p>Search for a city to view weather insights.</p>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/>
+                        </svg>
+                    </div>
+                    {% if insights.warmest_period %}
+                        <div class="stat-value">{{ insights.warmest_period.temperature }}°C</div>
+                        <div class="stat-label">Warmest Period</div>
+                        <div class="stat-datetime">{{ insights.warmest_period.datetime }}</div>
+                    {% else %}
+                        <div class="stat-value">—</div>
+                        <div class="stat-label">Warmest Period</div>
+                    {% endif %}
                 </div>
-            {% endif %}
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                        </svg>
+                    </div>
+                    {% if insights.coolest_period %}
+                        <div class="stat-value">{{ insights.coolest_period.temperature }}°C</div>
+                        <div class="stat-label">Coolest Period</div>
+                        <div class="stat-datetime">{{ insights.coolest_period.datetime }}</div>
+                    {% else %}
+                        <div class="stat-value">—</div>
+                        <div class="stat-label">Coolest Period</div>
+                    {% endif %}
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">{{ insights.humidity_observation }}</div>
+                    <div class="stat-label">Humidity Observation</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value">{{ insights.forecast_summary }}</div>
+                    <div class="stat-label">Forecast Summary</div>
+                </div>
+            </div>
         </div>
     </section>
-
+    {% endif %}
 
     <!-- Charts: Temperature & Humidity -->
-    <section class="section" aria-labelledby="trends-heading">
-        <div class="section-header">
-            <h2 id="trends-heading">
-                <span class="section-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                    </svg>
-                </span>
-                Trend Charts
-            </h2>
-        </div>
-
+    <section class="section panel" aria-labelledby="trends-heading">
         <div class="section-body">
+            <h2 id="trends-heading" class="section-title">Trend Charts</h2>
             <div class="charts-grid">
-
                 <!-- Temperature Trends -->
-                <div class="chart-card">
+                <div class="chart-panel">
                     <h3>
                         <span class="chart-dot chart-dot--temp" aria-hidden="true"></span>
                         Temperature Trends
@@ -499,7 +350,7 @@ Weather Dashboard — WeatherLab
                 </div>
 
                 <!-- Humidity Trends -->
-                <div class="chart-card">
+                <div class="chart-panel">
                     <h3>
                         <span class="chart-dot chart-dot--humidity" aria-hidden="true"></span>
                         Humidity Trends
@@ -524,26 +375,14 @@ Weather Dashboard — WeatherLab
                         </div>
                     {% endif %}
                 </div>
-
             </div>
         </div>
     </section>
 
-
     <!-- Search History -->
-    <section class="section" aria-labelledby="history-heading">
-        <div class="section-header">
-            <h2 id="history-heading">
-                <span class="section-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
-                    </svg>
-                </span>
-                Search History
-            </h2>
-        </div>
-
+    <section class="section panel" aria-labelledby="history-heading">
         <div class="section-body">
+            <h2 id="history-heading" class="section-title">Search History</h2>
             {% if history %}
                 <div class="history-grid">
                     {% for item in history %}
@@ -577,10 +416,53 @@ Weather Dashboard — WeatherLab
         </div>
     </section>
 
+    <!-- Favorites -->
+    {% if user.is_authenticated %}
+    <section class="section panel favorites-section">
+        <div class="section-body">
+            <div class="section-head">
+                <h2 class="section-title">My Favorite Cities</h2>
+                <p class="section-subtitle">Your saved weather locations</p>
+            </div>
+            {% for favorite in favorites %}
+                <div class="favorite-card">
+                    <div>
+                        <h3>{{ favorite.city }}</h3>
+                        {% if favorite.country %}
+                            <p>{{ favorite.country }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="favorite-actions">
+                        <a
+                            href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
+                            class="btn btn--primary btn--compact"
+                        >
+                            Open Weather
+                        </a>
+                        <form
+                            method="post"
+                            action="{% url 'remove_favorite_city' favorite.id %}"
+                        >
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--secondary btn--compact">
+                                Remove
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty-state">
+                    <p>You haven't saved any favorite cities yet.</p>
+                    <p>Search for a city and add it to your favorites.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
 </div>
 
 {% endblock %}
-
 
 {% block scripts %}
 
@@ -601,6 +483,15 @@ Weather Dashboard — WeatherLab
 <script>
     function initializeWeatherCharts() {
         const rootStyles = getComputedStyle(document.documentElement);
+        const fontFace = rootStyles.getPropertyValue("--dp-font-face").trim() || "sans-serif";
+
+        if (window.Chart) {
+            Chart.defaults.font.family = fontFace;
+            Chart.defaults.color = rootStyles.getPropertyValue("--dp-color-text-reading").trim() || "#a6a9ad";
+            if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                Chart.defaults.animation = false;
+            }
+        }
 
         // ── Temperature Trend Chart ──────────────────────────────
         try {
@@ -612,27 +503,26 @@ Weather Dashboard — WeatherLab
                 const labels = JSON.parse(tempLabelsEl.textContent);
                 const temps = JSON.parse(tempValuesEl.textContent);
 
-                // Format labels: "2021-01-07 12:00:00" → "Jan 7, 12:00"
                 const fmtLabels = labels.map(label => {
-                const date = new Date(label.replace(" ", "T"));
+                    const date = new Date(label.replace(" ", "T"));
 
-                if (Number.isNaN(date.getTime())) {
-                    return label;
-                }
+                    if (Number.isNaN(date.getTime())) {
+                        return label;
+                    }
 
-                const datePart = date.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric"
+                    const datePart = date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric"
+                    });
+
+                    const timePart = date.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false
+                    });
+
+                    return `${datePart}, ${timePart}`;
                 });
-
-                const timePart = date.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false
-                });
-
-                return `${datePart}, ${timePart}`;
-            });
 
                 new Chart(tempCanvas, {
                     type: "line",
@@ -641,11 +531,11 @@ Weather Dashboard — WeatherLab
                         datasets: [{
                             label: "Temperature (°C)",
                             data: temps,
-                            borderColor: rootStyles.getPropertyValue("--chart-temp-line").trim() || "#3b6cf5",
-                            backgroundColor: rootStyles.getPropertyValue("--chart-temp-fill").trim() || "rgba(59,108,245,0.10)",
+                            borderColor: rootStyles.getPropertyValue("--dp-chart-temp-line").trim() || "#3fd6c6",
+                            backgroundColor: rootStyles.getPropertyValue("--dp-chart-temp-fill").trim() || "rgba(63,214,198,0.10)",
                             borderWidth: 2,
                             pointRadius: 3,
-                            pointBackgroundColor: rootStyles.getPropertyValue("--chart-temp-line").trim() || "#3b6cf5",
+                            pointBackgroundColor: rootStyles.getPropertyValue("--dp-chart-temp-line").trim() || "#3fd6c6",
                             pointHoverRadius: 6,
                             pointHoverBackgroundColor: "#fff",
                             pointHoverBorderWidth: 2,
@@ -666,13 +556,13 @@ Weather Dashboard — WeatherLab
                                     usePointStyle: true,
                                     pointStyle: "circle",
                                     padding: 16,
-                                    font: { family: "'Inter', sans-serif", size: 12 }
+                                    font: { family: fontFace, size: 12, color: "#a6a9ad" }
                                 }
                             },
                             tooltip: {
-                                backgroundColor: "rgba(26, 29, 35, 0.92)",
-                                titleFont: { family: "'Inter', sans-serif", size: 12 },
-                                bodyFont: { family: "'Inter', sans-serif", size: 13, weight: "600" },
+                                backgroundColor: "rgba(14, 14, 14, 0.92)",
+                                titleFont: { family: fontFace, size: 12 },
+                                bodyFont: { family: fontFace, size: 13, weight: "600" },
                                 padding: 10,
                                 cornerRadius: 8,
                                 callbacks: {
@@ -682,14 +572,14 @@ Weather Dashboard — WeatherLab
                         },
                         scales: {
                             x: {
-                                title: { display: true, text: "Forecast Time", font: { family: "'Inter', sans-serif", size: 12 } },
-                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11 } },
+                                title: { display: true, text: "Forecast Time", font: { family: fontFace, size: 12 } },
+                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11, color: "#8a8d91" } },
                                 grid: { display: false }
                             },
                             y: {
-                                title: { display: true, text: "Temperature (°C)", font: { family: "'Inter', sans-serif", size: 12 } },
-                                ticks: { font: { size: 11 } },
-                                grid: { color: "rgba(0,0,0,0.05)" }
+                                title: { display: true, text: "Temperature (°C)", font: { family: fontFace, size: 12 } },
+                                ticks: { font: { size: 11, color: "#8a8d91" } },
+                                grid: { color: "rgba(34, 34, 34, 0.6)" }
                             }
                         }
                     }
@@ -737,11 +627,11 @@ Weather Dashboard — WeatherLab
                         datasets: [{
                             label: "Humidity (%)",
                             data: humidities,
-                            borderColor: rootStyles.getPropertyValue("--chart-humidity-line").trim() || "#0ea5c7",
-                            backgroundColor: rootStyles.getPropertyValue("--chart-humidity-fill").trim() || "rgba(14,165,199,0.10)",
+                            borderColor: rootStyles.getPropertyValue("--dp-chart-humidity-line").trim() || "#a6a9ad",
+                            backgroundColor: rootStyles.getPropertyValue("--dp-chart-humidity-fill").trim() || "rgba(138,141,145,0.10)",
                             borderWidth: 2,
                             pointRadius: 3,
-                            pointBackgroundColor: rootStyles.getPropertyValue("--chart-humidity-line").trim() || "#0ea5c7",
+                            pointBackgroundColor: rootStyles.getPropertyValue("--dp-chart-humidity-line").trim() || "#a6a9ad",
                             pointHoverRadius: 6,
                             pointHoverBackgroundColor: "#fff",
                             pointHoverBorderWidth: 2,
@@ -762,13 +652,13 @@ Weather Dashboard — WeatherLab
                                     usePointStyle: true,
                                     pointStyle: "circle",
                                     padding: 16,
-                                    font: { family: "'Inter', sans-serif", size: 12 }
+                                    font: { family: fontFace, size: 12, color: "#a6a9ad" }
                                 }
                             },
                             tooltip: {
-                                backgroundColor: "rgba(26, 29, 35, 0.92)",
-                                titleFont: { family: "'Inter', sans-serif", size: 12 },
-                                bodyFont: { family: "'Inter', sans-serif", size: 13, weight: "600" },
+                                backgroundColor: "rgba(14, 14, 14, 0.92)",
+                                titleFont: { family: fontFace, size: 12 },
+                                bodyFont: { family: fontFace, size: 13, weight: "600" },
                                 padding: 10,
                                 cornerRadius: 8,
                                 callbacks: {
@@ -778,16 +668,16 @@ Weather Dashboard — WeatherLab
                         },
                         scales: {
                             x: {
-                                title: { display: true, text: "Forecast Time", font: { family: "'Inter', sans-serif", size: 12 } },
-                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11 } },
+                                title: { display: true, text: "Forecast Time", font: { family: fontFace, size: 12 } },
+                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11, color: "#8a8d91" } },
                                 grid: { display: false }
                             },
                             y: {
                                 min: 0,
                                 max: 100,
-                                title: { display: true, text: "Humidity (%)", font: { family: "'Inter', sans-serif", size: 12 } },
-                                ticks: { font: { size: 11 } },
-                                grid: { color: "rgba(0,0,0,0.05)" }
+                                title: { display: true, text: "Humidity (%)", font: { family: fontFace, size: 12 } },
+                                ticks: { font: { size: 11, color: "#8a8d91" } },
+                                grid: { color: "rgba(34, 34, 34, 0.6)" }
                             }
                         }
                     }

@@ -1,13 +1,15 @@
-
 {% extends "base.html" %}
 
 {% block title %}My Favorite Cities — WeatherLab{% endblock %}
 
 {% block content %}
+
 <div class="dashboard">
-    <section class="hero">
-        <h1>My Favorite Cities</h1>
-        <p>Manage your saved weather locations.</p>
+    <section class="section" aria-labelledby="favorites-heading">
+        <div class="section-body">
+            <h1 id="favorites-heading">My Favorite Cities</h1>
+            <p>Manage your saved weather locations.</p>
+        </div>
     </section>
 
     {% if messages %}
@@ -18,7 +20,7 @@
         {% endfor %}
     {% endif %}
 
-    <section class="section">
+    <section class="section panel">
         <div class="section-body">
             {% for favorite in favorites %}
                 <div class="favorite-card">
@@ -32,7 +34,7 @@
                     <div class="favorite-actions">
                         <a
                             href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
-                            class="btn btn-primary"
+                            class="btn btn--primary btn--compact"
                         >
                             Open Weather
                         </a>
@@ -42,27 +44,16 @@
                             action="{% url 'remove_favorite_city' favorite.id %}"
                         >
                             {% csrf_token %}
-                            <button type="submit" class="btn">
+                            <button type="submit" class="btn btn--secondary btn--compact">
                                 Remove
                             </button>
                         </form>
                     </div>
-
-
-                    <form
-                        method="post"
-                        action="{% url 'remove_favorite_city' favorite.id %}"
-                    >
-                        {% csrf_token %}
-                        <button type="submit" class="btn">
-                            Remove
-                        </button>
-                    </form>
                 </div>
             {% empty %}
                 <div class="empty-state">
                     <p>You haven't saved any favorite cities yet.</p>
-                    <a href="{% url 'home' %}" class="btn">
+                    <a href="{% url 'home' %}" class="btn btn--primary">
                         Search for a City
                     </a>
                 </div>
@@ -70,8 +61,9 @@
         </div>
     </section>
 
-    <a href="{% url 'home' %}" class="btn">
+    <a href="{% url 'home' %}" class="btn btn--secondary">
         Back to Weather Dashboard
     </a>
 </div>
+
 {% endblock %}
