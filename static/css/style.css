@@ -267,8 +267,11 @@ main a:not(.btn):hover {
         align-items: stretch;
         gap: 2px;
         padding: 8px var(--dp-page-pad) 16px;
+        max-height: calc(100dvh - 64px);
+        overflow-y: auto;
         background: var(--dp-color-ground);
         border-bottom: 1px solid var(--dp-color-hairline);
+        -webkit-overflow-scrolling: touch;
     }
 
     .header-nav.open {
@@ -279,6 +282,12 @@ main a:not(.btn):hover {
         width: 100%;
         min-height: 44px;
         padding: 10px 8px;
+    }
+
+    .nav-link:focus-visible {
+        outline: 2px solid var(--dp-color-accent);
+        outline-offset: 2px;
+        background: var(--dp-color-hover);
     }
 }
 

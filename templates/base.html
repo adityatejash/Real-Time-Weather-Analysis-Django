@@ -33,7 +33,7 @@
             </a>
 
             <!-- Mobile menu button -->
-            <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle navigation menu" aria-expanded="false" type="button">
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle navigation menu" aria-controls="headerNav" aria-expanded="false" type="button">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <line x1="4" x2="20" y1="12" y2="12"/>
                     <line x1="4" x2="20" y1="6" y2="6"/>
@@ -91,11 +91,30 @@
         (() => {
             const mobileToggle = document.getElementById("mobileMenuToggle");
             const nav = document.getElementById("headerNav");
+            const navLinks = nav ? nav.querySelectorAll(".nav-link, .nav-auth-button") : [];
 
             if (mobileToggle && nav) {
+                function closeMenu() {
+                    nav.classList.remove("open");
+                    mobileToggle.setAttribute("aria-expanded", "false");
+                    mobileToggle.focus();
+                }
+
                 mobileToggle.addEventListener("click", () => {
-                    const expanded = nav.classList.toggle("open");
-                    mobileToggle.setAttribute("aria-expanded", expanded);
+                    const isOpen = nav.classList.toggle("open");
+                    mobileToggle.setAttribute("aria-expanded", String(isOpen));
+                });
+
+                // Close menu when a navigation link is activated
+                navLinks.forEach((link) => {
+                    link.addEventListener("click", closeMenu);
+                });
+
+                // Close menu on Escape key and return focus to toggle
+                document.addEventListener("keydown", (event) => {
+                    if (event.key === "Escape" && nav.classList.contains("open")) {
+                        closeMenu();
+                    }
                 });
             }
         })();
