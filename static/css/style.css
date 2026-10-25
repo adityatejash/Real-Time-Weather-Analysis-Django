@@ -634,6 +634,123 @@ input[type="date"] {
     outline-offset: 2px;
 }
 
+/* City autocomplete dropdown (GeoNames-backed, API-free) */
+.autocomplete-wrapper {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+}
+
+.autocomplete-wrapper input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    border-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.autocomplete-clear {
+    flex: none;
+    padding: 0 10px;
+    border: 0;
+    border-left: 1px solid var(--dp-color-hairline-strong);
+    border-top-right-radius: var(--dp-radius-control);
+    border-bottom-right-radius: var(--dp-radius-control);
+    background: var(--dp-color-ground);
+    color: var(--dp-color-text-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.autocomplete-clear:hover {
+    background: var(--dp-color-hover);
+    color: var(--dp-color-text);
+}
+
+.autocomplete-clear:focus-visible {
+    outline: 2px solid var(--dp-color-accent);
+    outline-offset: 0;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    border: 1px solid var(--dp-color-hairline);
+    border-top: 0;
+    border-bottom-left-radius: var(--dp-radius-control);
+    border-bottom-right-radius: var(--dp-radius-control);
+    background: var(--dp-color-panel);
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    margin-top: 4px;
+}
+
+.autocomplete-message {
+    padding: 8px 14px;
+    font-size: 0.8125rem;
+    color: var(--dp-color-text-muted);
+    border-bottom: 1px solid var(--dp-color-hairline);
+}
+
+.autocomplete-suggestion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--dp-color-hairline);
+    background: transparent;
+    color: var(--dp-color-text-reading);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.autocomplete-suggestion:last-child {
+    border-bottom: 0;
+}
+
+.autocomplete-suggestion strong {
+    color: var(--dp-color-text);
+    font-weight: 500;
+}
+
+.autocomplete-detail {
+    color: var(--dp-color-text-muted);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.autocomplete-suggestion:hover,
+.autocomplete-suggestion[aria-selected="true"] {
+    background: var(--dp-color-hover);
+    color: var(--dp-color-text);
+}
+
+.autocomplete-suggestion[aria-selected="true"] .autocomplete-detail {
+    color: var(--dp-color-accent);
+}
+
+.autocomplete-empty {
+    padding: 10px 14px;
+    color: var(--dp-color-text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+    cursor: default;
+}
+
 .form-field {
     min-width: 0;
 }

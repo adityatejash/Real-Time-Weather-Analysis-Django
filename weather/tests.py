@@ -1,13 +1,18 @@
+import io
+import os
 import secrets
+import tempfile
 from datetime import date, datetime
 from django.contrib.auth import authenticate, get_user_model
+from django.core.management import call_command
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
-from weather.models import WeatherData
+from weather.models import WeatherData, City
 from weather.services import analyze_weather_history, generate_weather_insights
+from weather.management.commands.import_cities import Command
 
 
 class WeatherChartTests(TestCase):
@@ -872,7 +877,7 @@ class AuthenticationFunctionalTests(TestCase):
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 class WeatherSearchOwnershipTests(TestCase):
@@ -1018,3 +1023,232 @@ class WeatherSearchExperienceTests(TestCase):
         self.assertContains(response, "London")
         self.assertContains(response, "Paris")
         self.assertContains(response, 'recent-search-chip')
+
+
+class CityModelTests(TestCase):
+    def test_city_str_includes_name_region_country(self):
+        city = City.objects.create(
+            name="London", region="England", country="GB",
+            latitude=51.5, longitude=-0.12, population=9000000,
+        )
+        self.assertEqual(str(city), "London, England, GB")
+
+    def test_city_str_without_region(self):
+        city = City.objects.create(
+            name="Testville", region="", country="US",
+            latitude=1.0, longitude=2.0, population=100,
+        )
+        self.assertEqual(str(city), "Testville, US")
+
+    def test_display_name_with_region(self):
+        city = City.objects.create(
+            name="Paris", region="Île-de-France", country="FR",
+            latitude=48.85, longitude=2.35, population=2000000,
+        )
+        self.assertEqual(city.display_name(), "Paris, Île-de-France, FR")
+
+    def test_display_name_without_region(self):
+        city = City.objects.create(
+            name="Testville", region="", country="US",
+            latitude=1.0, longitude=2.0, population=100,
+        )
+        self.assertEqual(city.display_name(), "Testville, US")
+
+    def test_city_has_indexes(self):
+        index_names = {index.name for index in City._meta.indexes}
+        self.assertIn("city_name_country_idx", index_names)
+        self.assertIn("city_country_name_idx", index_names)
+
+    def test_city_ordering_by_population_desc(self):
+        City.objects.create(name="Small", country="GB", latitude=1, longitude=2, population=100)
+        City.objects.create(name="Large", country="GB", latitude=1, longitude=2, population=9000000)
+        cities = list(City.objects.all())
+        self.assertEqual(cities[0].name, "Large")
+        self.assertEqual(cities[1].name, "Small")
+
+
+class CityAutocompleteTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse("city_autocomplete")
+        City.objects.create(
+            name="London", region="England", country="GB",
+            latitude=51.5, longitude=-0.12, population=9000000,
+        )
+        City.objects.create(
+            name="London", region="Ontario", country="CA",
+            latitude=42.98, longitude=-81.23, population=400000,
+        )
+        City.objects.create(
+            name="Paris", region="Île-de-France", country="FR",
+            latitude=48.85, longitude=2.35, population=2000000,
+        )
+
+    def test_returns_matching_cities_case_insensitive(self):
+        response = self.client.get(self.url, {"q": "lon"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 2)
+        names = [r["name"] for r in data["results"]]
+        self.assertEqual(names, ["London", "London"])
+        # Ordered by population descending: GB (9M) before CA (400k)
+        self.assertEqual(data["results"][0]["country"], "GB")
+        self.assertEqual(data["results"][1]["country"], "CA")
+
+    def test_returns_single_country_match(self):
+        response = self.client.get(self.url, {"q": "par"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["name"], "Paris")
+        self.assertEqual(data["results"][0]["country"], "FR")
+
+    def test_returns_no_results_for_unknown_query(self):
+        response = self.client.get(self.url, {"q": "zzznotacity"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["results"], [])
+
+    def test_result_structure(self):
+        response = self.client.get(self.url, {"q": "lon"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        result = data["results"][0]
+        self.assertEqual(
+            set(result.keys()),
+            {"name", "region", "country", "display_name", "latitude", "longitude"},
+        )
+        self.assertEqual(result["display_name"], "London, England, GB")
+        self.assertEqual(result["latitude"], 51.5)
+        self.assertEqual(result["longitude"], -0.12)
+
+    def test_result_limit_respected(self):
+        response = self.client.get(self.url, {"q": "lon", "limit": 1})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(len(data["results"]), 1)
+
+    def test_missing_query_returns_400(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("q", data["error"].lower())
+
+    def test_query_too_short_returns_400(self):
+        response = self.client.get(self.url, {"q": "a"})
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("2 characters", data["error"])
+
+    def test_query_too_long_returns_400(self):
+        response = self.client.get(self.url, {"q": "x" * 101})
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("too long", data["error"].lower())
+
+    def test_post_method_not_allowed(self):
+        response = self.client.post(self.url, {"q": "lon"})
+        self.assertEqual(response.status_code, 405)
+
+
+class ImportCitiesCommandTests(TestCase):
+    def _write_tsv(self, rows):
+        handle, path = tempfile.mkstemp(suffix=".txt")
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
+            for row in rows:
+                f.write("\t".join(row) + "\n")
+        return path
+
+    def test_import_from_local_file(self):
+        header = [
+            "geonameid", "name", "asciiname", "alternatenames", "latitude",
+            "longitude", "feature_class", "feature_code", "country_code", "cc2",
+            "admin1", "admin2", "admin3", "admin4", "population", "elevation",
+            "dem", "timezone", "modification_date",
+        ]
+        # GeoNames cities15000.txt has no header row; it is pure tab-separated data.
+        rows = [
+            ["1", "Testville", "Testville", "", "12.34", "56.78", "P", "city",
+             "US", "", "CA", "", "", "", "100000", "", "", "America/New_York",
+             "2020-01-01"],
+            ["2", "Otherton", "Otherton", "", "1.23", "4.56", "P", "city",
+             "GB", "", "ENG", "", "", "", "50000", "", "", "Europe/London",
+             "2020-01-01"],
+        ]
+        path = self._write_tsv(rows)
+        try:
+            call_command("import_cities", file=path, limit=10)
+            self.assertEqual(City.objects.count(), 2)
+            city = City.objects.get(name="Testville")
+            self.assertEqual(city.country, "US")
+            self.assertEqual(city.region, "CA")
+            self.assertEqual(city.latitude, 12.34)
+            self.assertEqual(city.longitude, 56.78)
+            self.assertEqual(city.population, 100000)
+        finally:
+            os.unlink(path)
+
+    def test_import_respects_limit(self):
+        # GeoNames cities15000.txt has no header row; it is pure tab-separated data.
+        rows = []
+        for i in range(5):
+            rows.append(
+                [str(i + 1), f"City{i}", f"City{i}", "", str(i), str(i), "P",
+                 "city", "US", "", "CA", "", "", "", str(1000 - i), "", "",
+                 "America/New_York", "2020-01-01"]
+            )
+        path = self._write_tsv(rows)
+        try:
+            call_command("import_cities", file=path, limit=2)
+            self.assertEqual(City.objects.count(), 2)
+        finally:
+            os.unlink(path)
+
+    def test_parse_rows_with_binary_stream_wrapped(self):
+        """_parse_rows should parse rows from a binary stream wrapped in TextIOWrapper."""
+        cmd = Command()
+        tsv = "\t".join([
+            "1", "Testville", "Testville", "", "12.34", "56.78", "P", "city",
+            "US", "", "CA", "", "", "", "100000", "", "", "America/New_York",
+            "2020-01-01",
+        ]) + "\n"
+        binary_stream = io.BytesIO(tsv.encode("utf-8"))
+        with io.TextIOWrapper(binary_stream, encoding="utf-8") as text_stream:
+            parsed = list(cmd._parse_rows(text_stream))
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["name"], "Testville")
+        self.assertEqual(parsed[0]["country"], "US")
+        self.assertEqual(parsed[0]["population"], 100000)
+
+    def test_download_and_read_wraps_binary_stream(self):
+        """_download_and_read should wrap the ZIP member stream in TextIOWrapper."""
+        import zipfile
+
+        tsv = "\t".join([
+            "1", "Testville", "Testville", "", "12.34", "56.78", "P", "city",
+            "US", "", "CA", "", "", "", "100000", "", "", "America/New_York",
+            "2020-01-01",
+        ]) + "\n"
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("cities15000.txt", tsv.encode("utf-8"))
+        zip_bytes = buf.getvalue()
+
+        mock_response = Mock()
+        mock_response.read.return_value = zip_bytes
+        with patch(
+            "weather.management.commands.import_cities.urlopen"
+        ) as mock_urlopen:
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+            cmd = Command()
+            rows = cmd._download_and_read("http://example.com/cities15000.zip")
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "Testville")
+        self.assertEqual(rows[0]["country"], "US")
+        self.assertEqual(rows[0]["latitude"], 12.34)
+        self.assertEqual(rows[0]["longitude"], 56.78)
+        self.assertEqual(rows[0]["population"], 100000)
