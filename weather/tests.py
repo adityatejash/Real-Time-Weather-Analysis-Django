@@ -965,3 +965,56 @@ class WeatherSearchOwnershipTests(TestCase):
             list(WeatherData.objects.filter(user=self.user_b)),
             [search_b],
         )
+
+
+class WeatherSearchExperienceTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('home')
+
+    @patch('weather.views.get_weather_data')
+    @patch('weather.views.get_forecast_data')
+    def test_error_message_rendered_inline_in_search_section(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-019: Error message appears inline in search section when API returns error."""
+        mock_get_weather.return_value = {"error": "City not found."}
+        mock_get_forecast.return_value = {"error": "City not found."}
+
+        response = self.client.get(self.url, {'city': 'Nowhere'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('error', response.context)
+        self.assertEqual(response.context['error'], "City not found.")
+        self.assertContains(response, "City not found.")
+        self.assertContains(response, 'id="searchError"')
+
+    @patch('weather.views.get_weather_data')
+    @patch('weather.views.get_forecast_data')
+    def test_recent_searches_rendered_as_chips(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-020: Recent searches appear as quick-select chips."""
+        User = get_user_model()
+        user = User.objects.create_user(username="recent_user", password="testpass123")
+
+        WeatherData.objects.create(
+            user=user,
+            city="London", country="GB", temperature=15.0, feels_like=14.0,
+            humidity=60, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20,
+        )
+        WeatherData.objects.create(
+            user=user,
+            city="Paris", country="FR", temperature=20.0, feels_like=19.0,
+            humidity=55, pressure=1013, description="partly cloudy",
+            wind_speed=4.0, clouds=40,
+        )
+
+        self.client.force_login(user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('latest_searches', response.context)
+        self.assertEqual(len(response.context['latest_searches']), 2)
+        self.assertContains(response, "London")
+        self.assertContains(response, "Paris")
+        self.assertContains(response, 'recent-search-chip')
