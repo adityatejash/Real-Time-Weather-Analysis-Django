@@ -11,8 +11,56 @@ Weather Dashboard — WeatherLab
     <!-- City Search -->
     <section class="section panel" aria-label="City search">
         <div class="section-body">
+            {% if error %}
+            <div class="message message--error" role="alert" id="searchError">
+                <strong>Search error:</strong> {{ error }}
+            </div>
+            {% endif %}
+
             <form method="get" class="search-form" id="citySearchForm">
-                {{ form.as_p }}
+                <div class="form-field search-form-field" role="search" aria-label="City search">
+                    <label for="city">{{ form.city.label }}</label>
+                    <div class="autocomplete-wrapper" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-owns="citySuggestions" aria-controls="citySuggestions">
+                        <input
+                            type="text"
+                            name="city"
+                            id="city"
+                            placeholder="Enter city name"
+                            required
+                            autocomplete="off"
+                            role="searchbox"
+                            aria-autocomplete="list"
+                            aria-controls="citySuggestions"
+                            aria-activedescendant=""
+                        />
+                        <button
+                            type="button"
+                            class="btn--compact autocomplete-clear"
+                            id="cityClear"
+                            aria-label="Clear city search"
+                            style="display: none;"
+                        >
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    <div
+                        id="citySuggestions"
+                        role="listbox"
+                        aria-label="City suggestions"
+                        class="autocomplete-dropdown"
+                        style="display: none;"
+                    >
+                        <div
+                            class="autocomplete-message"
+                            role="status"
+                            aria-live="polite"
+                            id="autocompleteStatus"
+                        ></div>
+                    </div>
+                </div>
+                    {% for error in form.city.errors %}
+                    <p class="field-error">{{ error }}</p>
+                    {% endfor %}
+                </div>
                 <button type="submit" class="btn btn--primary" id="searchButton">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"/>
@@ -21,15 +69,25 @@ Weather Dashboard — WeatherLab
                     Search
                 </button>
             </form>
+
+            {% if latest_searches %}
+            <div class="recent-searches">
+                <p class="recent-searches-label">Recent searches</p>
+                <div class="recent-searches-list">
+                    {% for item in latest_searches %}
+                    <button
+                        type="button"
+                        class="recent-search-chip"
+                        onclick="document.getElementById('city').value = '{{ item.city|escapejs }}'; document.getElementById('citySearchForm').submit();"
+                    >
+                        {{ item.city }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </section>
-
-    <!-- Error Message -->
-    {% if error %}
-        <div class="message message--error" role="alert" id="errorMessage">
-            <strong>Error:</strong> {{ error }}
-        </div>
-    {% endif %}
 
     <!-- Current Weather -->
     {% if weather %}
@@ -144,7 +202,7 @@ Weather Dashboard — WeatherLab
     {% else %}
     <section class="section panel">
         <div class="section-body">
-            <h2 class="section-title">Current Weather</h2>
+            <h2 class="section-title">Current WWeather</h2>
             <div class="empty-state">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="4.93" y1="4.93" y2="4.93"/><line x1="19.07" x2="19.07" y1="19.07" y2="19.07"/><line x1="2.29" x2="2.29" y1="2.29" y2="2.29"/><line x1="21.71" x2="21.71" y1="21.71" y2="21.71"/>
@@ -693,5 +751,211 @@ Weather Dashboard — WeatherLab
     } else {
         initializeWeatherCharts();
     }
+</script>
+
+<script>
+    (function () {
+        var cityInput = document.getElementById("city");
+        var dropdown = document.getElementById("citySuggestions");
+        var status = document.getElementById("autocompleteStatus");
+        var clearBtn = document.getElementById("cityClear");
+        var combobox = document.querySelector(".autocomplete-wrapper");
+
+        if (!cityInput || !dropdown) {
+            return;
+        }
+
+        var AUTOCOMPLETE_URL = "{% url 'city_autocomplete' %}";
+        var DEBOUNCE_MS = 250;
+        var MIN_QUERY_LENGTH = 2;
+        var timer = null;
+        var activeIndex = -1;
+        var options = [];
+
+        function setStatus(message) {
+            if (status) {
+                status.textContent = message;
+            }
+        }
+
+        function toggleClearButton() {
+            if (!clearBtn) {
+                return;
+            }
+            clearBtn.style.display = cityInput.value.length > 0 ? "inline-block" : "none";
+        }
+
+        function closeDropdown() {
+            dropdown.style.display = "none";
+            combobox.setAttribute("aria-expanded", "false");
+            cityInput.setAttribute("aria-activedescendant", "");
+            activeIndex = -1;
+            options = [];
+            setStatus("");
+        }
+
+        function renderSuggestions(results) {
+            dropdown.querySelectorAll('[role="option"]').forEach(function (el) {
+                el.remove();
+            });
+
+            if (!results || results.length === 0) {
+                setStatus("No cities found for your search.");
+                dropdown.style.display = "block";
+                combobox.setAttribute("aria-expanded", "true");
+                return;
+            }
+
+            setStatus(results.length + " city suggestion" + (results.length !== 1 ? "s" : "") + " available.");
+
+            results.forEach(function (item, index) {
+                var button = document.createElement("button");
+                button.type = "button";
+                button.role = "option";
+                button.id = "city-option-" + index;
+                button.className = "autocomplete-suggestion";
+                button.setAttribute("aria-selected", "false");
+                button.dataset.name = item.name;
+                button.dataset.lat = item.latitude;
+                button.dataset.lon = item.longitude;
+
+                var namePart = document.createElement("strong");
+                namePart.textContent = item.name;
+                var detailPart = document.createElement("span");
+                detailPart.className = "autocomplete-detail";
+                detailPart.textContent = item.display_name;
+
+                button.appendChild(namePart);
+                button.appendChild(detailPart);
+                dropdown.appendChild(button);
+            });
+
+            options = dropdown.querySelectorAll('[role="option"]');
+            dropdown.style.display = "block";
+            combobox.setAttribute("aria-expanded", "true");
+            activeIndex = -1;
+            cityInput.setAttribute("aria-activedescendant", "");
+        }
+
+        function setActive(index) {
+            if (options.length === 0) {
+                return;
+            }
+            if (activeIndex >= 0 && activeIndex < options.length) {
+                options[activeIndex].setAttribute("aria-selected", "false");
+                options[activeIndex].classList.remove("autocomplete-active");
+            }
+            activeIndex = index;
+            if (activeIndex >= 0 && activeIndex < options.length) {
+                options[activeIndex].setAttribute("aria-selected", "true");
+                options[activeIndex].classList.add("autocomplete-active");
+                cityInput.setAttribute("aria-activedescendant", options[activeIndex].id);
+                options[activeIndex].scrollIntoView({ block: "nearest" });
+            } else {
+                cityInput.setAttribute("aria-activedescendant", "");
+            }
+        }
+
+        function selectByName(name) {
+            cityInput.value = name;
+            toggleClearButton();
+            closeDropdown();
+            setStatus("Selected " + name);
+        }
+
+        function fetchSuggestions(query) {
+            if (query.length < MIN_QUERY_LENGTH) {
+                closeDropdown();
+                return;
+            }
+            var url = AUTOCOMPLETE_URL + "?q=" + encodeURIComponent(query) + "&limit=10";
+            fetch(url)
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("City suggestions unavailable");
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    renderSuggestions(data.results || []);
+                })
+                .catch(function () {
+                    closeDropdown();
+                    setStatus("Unable to load city suggestions.");
+                });
+        }
+
+        var debouncedFetch = function () {
+            var query = cityInput.value.trim();
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                fetchSuggestions(query);
+            }, DEBOUNCE_MS);
+        };
+
+        cityInput.addEventListener("input", function () {
+            toggleClearButton();
+            debouncedFetch();
+        });
+
+        cityInput.addEventListener("focus", function () {
+            if (cityInput.value.trim().length >= MIN_QUERY_LENGTH) {
+                debouncedFetch();
+            }
+        });
+
+        clearBtn.addEventListener("click", function () {
+            cityInput.value = "";
+            toggleClearButton();
+            closeDropdown();
+            setStatus("");
+            cityInput.focus();
+        });
+
+        cityInput.addEventListener("keydown", function (e) {
+            if (options.length === 0) {
+                return;
+            }
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                var next = activeIndex + 1;
+                if (next >= options.length) {
+                    next = 0;
+                }
+                setActive(next);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                var prev = activeIndex - 1;
+                if (prev < 0) {
+                    prev = options.length - 1;
+                }
+                setActive(prev);
+            } else if (e.key === "Enter") {
+                if (activeIndex >= 0 && activeIndex < options.length) {
+                    e.preventDefault();
+                    selectByName(options[activeIndex].dataset.name);
+                    cityInput.form.submit();
+                }
+            } else if (e.key === "Escape") {
+                e.preventDefault();
+                closeDropdown();
+            }
+        });
+
+        dropdown.addEventListener("click", function (e) {
+            var option = e.target.closest('[role="option"]');
+            if (option && option.dataset.name) {
+                selectByName(option.dataset.name);
+            }
+        });
+
+        document.addEventListener("click", function (e) {
+            if (!combobox.contains(e.target)) {
+                closeDropdown();
+            }
+        });
+
+        toggleClearButton();
+    })();
 </script>
 {% endblock %}
