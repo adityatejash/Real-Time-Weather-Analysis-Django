@@ -1,71 +1,71 @@
 {% extends "base.html" %}
 
-{% block title %}Login | WeatherLab{% endblock %}
+{% block title %}Log in | WeatherLab{% endblock %}
 
 {% block content %}
-<section class="auth-container">
-    <div class="auth-card">
-        <h1>Welcome Back</h1>
-        <p class="auth-subtitle">
-            Log in to your WeatherLab account.
-        </p>
+<div class="auth-page">
+    <div class="auth-panel">
+        <section class="section panel">
+            <div class="section-body">
+            <h1>Welcome Back</h1>
+            <p>Log in to your WeatherLab account.</p>
 
-        {% if messages %}
-            {% for message in messages %}
-                <div class="auth-message" role="status">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-
-        <form method="post" class="auth-form">
-            {% csrf_token %}
-
-            {% if form.non_field_errors %}
-                <div class="auth-error" role="alert">
-                    {{ form.non_field_errors }}
-                </div>
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="message" role="status">
+                        {{ message }}
+                    </div>
+                {% endfor %}
             {% endif %}
 
-            <div class="auth-field">
-                <label for="{{ form.username.id_for_label }}">
-                    Username
-                </label>
-                {{ form.username }}
+            <form method="post" class="auth-form">
+                {% csrf_token %}
 
-                {% for error in form.username.errors %}
-                    <p class="auth-error">{{ error }}</p>
-                {% endfor %}
-            </div>
+                {% if form.non_field_errors %}
+                    <div class="form-errors" role="alert">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
 
-            <div class="auth-field">
-                <label for="{{ form.password.id_for_label }}">
-                    Password
-                </label>
-                {{ form.password }}
+                <div class="form-field">
+                    <label for="{{ form.username.id_for_label }}">
+                        Username
+                    </label>
+                    {{ form.username }}
+                    {% for error in form.username.errors %}
+                        <p class="field-error">{{ error }}</p>
+                    {% endfor %}
+                </div>
 
-                {% for error in form.password.errors %}
-                    <p class="auth-error">{{ error }}</p>
-                {% endfor %}
-            </div>
+                <div class="form-field">
+                    <label for="{{ form.password.id_for_label }}">
+                        Password
+                    </label>
+                    {{ form.password }}
+                    {% for error in form.password.errors %}
+                        <p class="field-error">{{ error }}</p>
+                    {% endfor %}
+                </div>
 
-            {% if request.GET.next %}
-                <input
-                    type="hidden"
-                    name="next"
-                    value="{{ request.GET.next }}"
-                >
-            {% endif %}
+                {% if request.GET.next %}
+                    <input
+                        type="hidden"
+                        name="next"
+                        value="{{ request.GET.next }}"
+                    >
+                {% endif %}
 
-            <button type="submit" class="auth-submit">
-                Log In
-            </button>
-        </form>
+                <button type="submit" class="btn btn--primary">
+                    Log In
+                </button>
+            </form>
 
-        <p class="auth-footer">
-            Don't have an account?
-            <a href="{% url 'register' %}">Create an account</a>
-        </p>
-    </div>
-</section>
+            <p class="register-login-link">
+                Don't have an account?
+                <a href="{% url 'register' %}">Create an account</a>
+            </p>
+        </div>
+    </section>
+</div>
+</div>
 {% endblock %}
