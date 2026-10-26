@@ -8,6 +8,11 @@ Weather Dashboard — WeatherLab
 
 <div class="dashboard">
 
+    <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite" aria-hidden="true">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <span class="visually-hidden">Loading weather data…</span>
+    </div>
+
     <!-- City Search -->
     <section class="section panel" aria-label="City search">
         <div class="section-body">
@@ -78,7 +83,7 @@ Weather Dashboard — WeatherLab
                     <button
                         type="button"
                         class="recent-search-chip"
-                        onclick="document.getElementById('city').value = '{{ item.city|escapejs }}'; document.getElementById('citySearchForm').submit();"
+                        onclick="showWeatherLoading(); document.getElementById('city').value = '{{ item.city|escapejs }}'; document.getElementById('citySearchForm').submit();"
                     >
                         {{ item.city }}
                     </button>
@@ -956,6 +961,27 @@ Weather Dashboard — WeatherLab
         });
 
         toggleClearButton();
+    })();
+</script>
+
+<script>
+    (function () {
+        var form = document.getElementById("citySearchForm");
+        var overlay = document.getElementById("loadingOverlay");
+        var submitBtn = document.getElementById("searchButton");
+
+        if (!form || !overlay || !submitBtn) {
+            return;
+        }
+
+        window.showWeatherLoading = function () {
+            overlay.classList.add("loading-overlay--visible");
+            overlay.setAttribute("aria-hidden", "false");
+            submitBtn.disabled = true;
+            form.classList.add("search-form--loading");
+        };
+
+        form.addEventListener("submit", window.showWeatherLoading);
     })();
 </script>
 {% endblock %}

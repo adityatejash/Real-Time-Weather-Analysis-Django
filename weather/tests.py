@@ -1252,3 +1252,24 @@ class ImportCitiesCommandTests(TestCase):
         self.assertEqual(rows[0]["latitude"], 12.34)
         self.assertEqual(rows[0]["longitude"], 56.78)
         self.assertEqual(rows[0]["population"], 100000)
+
+class WeatherLoadingStateTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse("home")
+
+    def test_loading_overlay_rendered_on_home_page(self):
+        """TC-038: Loading state overlay is rendered on the home page."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'loading-overlay')
+        self.assertContains(response, 'id="loadingOverlay"')
+        self.assertContains(response, 'loading-spinner')
+        self.assertContains(response, 'role="status"')
+        self.assertContains(response, 'aria-hidden="true"')
+
+    def test_loading_overlay_hidden_by_default(self):
+        """TC-038: Loading state overlay is hidden by default."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'aria-hidden="true"')
