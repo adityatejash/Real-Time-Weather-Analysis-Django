@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}My Favorite Cities — WeatherLab{% endblock %}
+
+{% block content %}
+
+<div class="dashboard">
+    <section class="section" aria-labelledby="favorites-heading">
+        <div class="section-body">
+            <h1 id="favorites-heading">My Favorite Cities</h1>
+            <p>Manage your saved weather locations.</p>
+        </div>
+    </section>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="message" role="status">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <section class="section panel">
+        <div class="section-body">
+            {% for favorite in favorites %}
+                <div class="favorite-card">
+                    <div>
+                        <h3>{{ favorite.city }}</h3>
+                        {% if favorite.country %}
+                            <p>{{ favorite.country }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="favorite-actions">
+                        <a
+                            href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
+                            class="btn btn--primary btn--compact"
+                        >
+                            Open Weather
+                        </a>
+
+                        <form
+                            method="post"
+                            action="{% url 'remove_favorite_city' favorite.id %}"
+                        >
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--secondary btn--compact">
+                                Remove
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <p>You haven't saved any favorite cities yet.</p>
+                    <a href="{% url 'home' %}" class="btn btn--primary">
+                        Search for a City
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <a href="{% url 'home' %}" class="btn btn--secondary">
+        Back to Weather Dashboard
+    </a>
+</div>
+
+{% endblock %}
