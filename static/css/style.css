@@ -791,6 +791,48 @@ input[type="date"] {
 }
 
 
+/* Loading state ---------------------------------------------------------- */
+
+/* Full-page loading overlay shown while weather data is being retrieved. */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    place-items: center;
+    gap: var(--dp-space-sm);
+    background: rgba(5, 5, 5, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.loading-overlay--visible {
+    display: grid;
+}
+
+.loading-overlay[aria-hidden="true"] {
+    display: none;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--dp-color-hairline-strong);
+    border-top-color: var(--dp-color-accent);
+    border-radius: 50%;
+    animation: dp-spin 0.8s linear infinite;
+}
+
+@keyframes dp-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Button loading state */
+.search-form--loading .btn--primary {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* 6. Messages & empty states ---------------------------------------------- */
 
 .message {
