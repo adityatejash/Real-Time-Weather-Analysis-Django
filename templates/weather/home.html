@@ -268,7 +268,7 @@ Weather Dashboard — WeatherLab
                             <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
                         </svg>
                     </div>
-                    <div class="stat-value">{{ statistics.avg_temperature }}°C</div>
+                    <div class="stat-value">{{ statistics.avg_temperature|default:"—" }}°C</div>
                     <div class="stat-label">Avg Temperature</div>
                 </div>
                 <div class="stat-card">
@@ -277,7 +277,7 @@ Weather Dashboard — WeatherLab
                             <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/><line x1="20" x2="20" y1="7" y2="11"/>
                         </svg>
                     </div>
-                    <div class="stat-value">{{ statistics.max_temperature }}°C</div>
+                    <div class="stat-value">{{ statistics.max_temperature|default:"—" }}°C</div>
                     <div class="stat-label">Max Temperature</div>
                 </div>
                 <div class="stat-card">
@@ -286,7 +286,7 @@ Weather Dashboard — WeatherLab
                             <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/>
                         </svg>
                     </div>
-                    <div class="stat-value">{{ statistics.min_temperature }}°C</div>
+                    <div class="stat-value">{{ statistics.min_temperature|default:"—" }}°C</div>
                     <div class="stat-label">Min Temperature</div>
                 </div>
                 <div class="stat-card">
@@ -295,7 +295,7 @@ Weather Dashboard — WeatherLab
                             <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
                         </svg>
                     </div>
-                    <div class="stat-value">{{ statistics.avg_humidity }}%</div>
+                    <div class="stat-value">{{ statistics.avg_humidity|default:"—" }}%</div>
                     <div class="stat-label">Avg Humidity</div>
                 </div>
                 <div class="stat-card">
@@ -304,7 +304,7 @@ Weather Dashboard — WeatherLab
                             <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
                         </svg>
                     </div>
-                    <div class="stat-value">{{ statistics.avg_wind_speed }} m/s</div>
+                    <div class="stat-value">{{ statistics.avg_wind_speed|default:"—" }} m/s</div>
                     <div class="stat-label">Avg Wind Speed</div>
                 </div>
             </div>
@@ -474,6 +474,7 @@ Weather Dashboard — WeatherLab
                         <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
                     </svg>
                     <p>No weather searches yet.</p>
+                    <p>Use the search above to look up a city.</p>
                 </div>
             {% endif %}
         </div>

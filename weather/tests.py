@@ -1273,3 +1273,57 @@ class WeatherLoadingStateTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'aria-hidden="true"')
+
+
+class WeatherEmptyStateTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('home')
+
+    def test_home_page_shows_empty_history_state(self):
+        """TC-039: Home page shows empty state when there is no search history."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No weather searches yet.")
+        self.assertContains(response, "Use the search above to look up a city.")
+
+    def test_favorites_page_shows_empty_state(self):
+        """TC-040: Favorites page shows empty state when user has no favorites."""
+        User = get_user_model()
+        user = User.objects.create_user(username="empty_fav_user", password="testpass123")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('favorites'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You haven't saved any favorite cities yet.")
+        self.assertContains(response, "Search for a City")
+
+    @patch('weather.views.get_weather_data')
+    @patch('weather.views.get_forecast_data')
+    def test_statistics_fields_show_dash_when_values_missing(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-041: Statistics fields show "—" when data values are missing."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 20.0,
+                "feels_like": 19.5,
+                "humidity": 50,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        response = self.client.get(self.url, {'city': 'London'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "—°C")
+        self.assertContains(response, "—%")
+        self.assertContains(response, "— m/s")
