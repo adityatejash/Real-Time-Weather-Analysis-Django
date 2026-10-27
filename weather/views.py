@@ -7,7 +7,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.http import require_POST
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
+from urllib.parse import urlencode
 
 from .forms import CitySearchForm, RegistrationForm
 from .models import FavoriteCity, City
@@ -92,7 +94,15 @@ def home(request):
     favorites = get_user_favorite_cities(request.user)
 
 
-    latest_searches = history[:10]
+    # Deduplicate recent searches by city (case-insensitive), keeping most recent
+    seen_cities = set()
+    deduped_history = []
+    for record in history:
+        key = record.city.lower()
+        if key not in seen_cities:
+            seen_cities.add(key)
+            deduped_history.append(record)
+    latest_searches = deduped_history[:10]
     city_weather = None
     searched_city = request.GET.get("city")
 
@@ -339,7 +349,7 @@ def add_favorite_city(request):
     else:
         messages.info(request, f"{city} is already in your favorites.")
 
-    return redirect("home")
+    return redirect(f"{reverse('home')}?{urlencode({'city': city})}")
 
 @login_required(login_url="login")
 @require_POST

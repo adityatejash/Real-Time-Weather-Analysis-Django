@@ -1750,3 +1750,118 @@ class ErrorPageTests(TestCase):
             urlconf.handler403, "weather.views.permission_denied"
         )
         self.assertEqual(urlconf.handler400, "weather.views.bad_request")
+
+
+class FavoriteCityRedirectTests(TestCase):
+    """Regression test for Bug 1: add_favorite_city must preserve weather data.
+
+    Previously the view redirected to plain ``home`` without the ``?city=``
+    query parameter, so the home view skipped the weather API fetch and the
+    weather data vanished after adding a favorite.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="fav_redirect_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("add_favorite_city")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_redirects_home_with_city_param(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-093: Adding a favorite redirects to home with ?city= so weather persists."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        response = self.client.post(self.url, {"city": "London", "country": "GB"})
+        self.assertRedirects(response, reverse("home") + "?city=London")
+
+
+class RecentSearchDedupTests(TestCase):
+    """Regression test for Bug 2: recent searches must not show duplicate cities.
+
+    Previously ``latest_searches = history[:10`` returned every
+    WeatherData record, so the same city searched multiple times appeared
+    repeatedly. Recent searches are now deduplicated by city
+    (case-insensitive), keeping the most recent record per city.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="dedup_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+
+        self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
+        self.t2 = timezone.make_aware(datetime(2026, 1, 15, 11, 0, 0))
+        self.t3 = timezone.make_aware(datetime(2026, 1, 15, 12, 0, 0))
+        self.t4 = timezone.make_aware(datetime(2026, 1, 15, 13, 0, 0))
+
+        r1 = WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=15.0, feels_like=14.0,
+            humidity=60, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20,
+        )
+        r2 = WeatherData.objects.create(
+            user=self.user,
+            city="london", country="GB", temperature=16.0, feels_like=15.0,
+            humidity=55, pressure=1013, description="partly cloudy",
+            wind_speed=4.0, clouds=40,
+        )
+        r3 = WeatherData.objects.create(
+            user=self.user,
+            city="LONDON", country="GB", temperature=17.0, feels_like=16.0,
+            humidity=50, pressure=1010, description="rain",
+            wind_speed=5.0, clouds=90,
+        )
+        r4 = WeatherData.objects.create(
+            user=self.user,
+            city="Paris", country="FR", temperature=20.0, feels_like=19.0,
+            humidity=70, pressure=1020, description="snow",
+            wind_speed=2.0, clouds=100,
+        )
+
+        WeatherData.objects.filter(pk=r1.pk).update(searched_at=self.t1)
+        WeatherData.objects.filter(pk=r2.pk).update(searched_at=self.t2)
+        WeatherData.objects.filter(pk=r3.pk).update(searched_at=self.t3)
+        WeatherData.objects.filter(pk=r4.pk).update(searched_at=self.t4)
+
+    def test_latest_searches_deduplicated_by_city_case_insensitive(
+        self,
+    ):
+        """TC-094: Recent searches deduplicate by city (case-insensitive), most recent kept."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        latest = list(response.context["latest_searches"])
+        # 4 records but only 2 unique cities (London/LONDON/london collapse to one)
+        self.assertEqual(len(latest), 2)
+        city_names_lower = [r.city.lower() for r in latest]
+        self.assertEqual(city_names_lower.count("london"), 1)
+        self.assertEqual(city_names_lower.count("paris"), 1)
+        # Ordering is -searched_at: Paris (t4) most recent, then LONDON (t3)
+        self.assertEqual(latest[0].city, "Paris")
+        self.assertEqual(latest[1].city, "LONDON")
