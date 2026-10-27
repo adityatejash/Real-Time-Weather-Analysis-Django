@@ -19,6 +19,37 @@ class WeatherDataAdmin(admin.ModelAdmin):
     ordering = ["-searched_at"]
     date_hierarchy = "searched_at"
     raw_id_fields = ["user"]
+    readonly_fields = ["searched_at"]
+    list_select_related = ["user"]
+
+    fieldsets = [
+        (
+            "Location",
+            {
+                "fields": ["city", "country"],
+            },
+        ),
+        (
+            "Weather Measurements",
+            {
+                "fields": [
+                    "temperature",
+                    "feels_like",
+                    "humidity",
+                    "pressure",
+                    "wind_speed",
+                    "clouds",
+                    "description",
+                ],
+            },
+        ),
+        (
+            "Metadata",
+            {
+                "fields": ["user", "searched_at"],
+            },
+        ),
+    ]
 
 
 @admin.register(FavoriteCity)
@@ -28,6 +59,24 @@ class FavoriteCityAdmin(admin.ModelAdmin):
     search_fields = ["city", "country", "user__username"]
     ordering = ["city"]
     raw_id_fields = ["user"]
+    readonly_fields = ["created_at"]
+    list_select_related = ["user"]
+    date_hierarchy = "created_at"
+
+    fieldsets = [
+        (
+            "Location",
+            {
+                "fields": ["city", "country"],
+            },
+        ),
+        (
+            "Metadata",
+            {
+                "fields": ["user", "created_at"],
+            },
+        ),
+    ]
 
 
 @admin.register(City)
@@ -36,3 +85,24 @@ class CityAdmin(admin.ModelAdmin):
     list_filter = ["country", "region"]
     search_fields = ["name", "region", "country"]
     ordering = ["-population", "name"]
+
+    fieldsets = [
+        (
+            "Location",
+            {
+                "fields": ["name", "region", "country"],
+            },
+        ),
+        (
+            "Geography",
+            {
+                "fields": ["latitude", "longitude"],
+            },
+        ),
+        (
+            "Demographics",
+            {
+                "fields": ["population"],
+            },
+        ),
+    ]
