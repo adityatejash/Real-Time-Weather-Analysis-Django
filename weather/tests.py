@@ -1649,3 +1649,104 @@ class WeatherUtilsTests(TestCase):
     def test_humidity_boolean(self):
         """TC-082: Boolean humidity returns Data unavailable."""
         self.assertEqual(humidity_comfort_level(True), "Data unavailable")
+
+
+class ErrorPageTests(TestCase):
+    """Tests for custom user-friendly error pages (WT-055).
+
+    Covers 400, 403, 404, and 500 error pages: status codes, templates,
+    rendered content, URL route accessibility, and handler wiring.
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+    # --- 404 Page Not Found ---
+
+    def test_404_page_returns_status_and_template(self):
+        """TC-083: 404 page returns 404 status and uses 404 template."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "weather/404.html")
+
+    def test_404_page_displays_message(self):
+        """TC-084: 404 page contains the expected heading and message."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertContains(response, "Page Not Found", status_code=404)
+        self.assertContains(
+            response,
+            "The page you're looking for doesn't exist.",
+            status_code=404,
+        )
+        self.assertContains(response, "Return Home", status_code=404)
+
+    def test_404_page_home_link_resolves(self):
+        """TC-085: 404 page Return Home link points to home URL."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertContains(response, reverse("home"), status_code=404)
+
+    # --- 500 Server Error ---
+
+    def test_500_page_returns_status_and_template(self):
+        """TC-086: 500 page returns 500 status and uses 500 template."""
+        response = self.client.get(reverse("server_error"))
+        self.assertEqual(response.status_code, 500)
+        self.assertTemplateUsed(response, "weather/500.html")
+
+    def test_500_page_displays_message(self):
+        """TC-087: 500 page contains the expected heading and message."""
+        response = self.client.get(reverse("server_error"))
+        self.assertContains(response, "Server Error", status_code=500)
+        self.assertContains(
+            response, "Something went wrong on our end.", status_code=500
+        )
+        self.assertContains(response, "Return Home", status_code=500)
+
+    # --- 403 Permission Denied ---
+
+    def test_403_page_returns_status_and_template(self):
+        """TC-088: 403 page returns 403 status and uses 403 template."""
+        response = self.client.get(reverse("permission_denied"))
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "weather/403.html")
+
+    def test_403_page_displays_message(self):
+        """TC-089: 403 page contains the expected heading and message."""
+        response = self.client.get(reverse("permission_denied"))
+        self.assertContains(response, "Permission Denied", status_code=403)
+        self.assertContains(
+            response, "You don't have permission to view this page.", status_code=403
+        )
+        self.assertContains(response, "Return Home", status_code=403)
+
+    # --- 400 Bad Request ---
+
+    def test_400_page_returns_status_and_template(self):
+        """TC-090: 400 page returns 400 status and uses 400 template."""
+        response = self.client.get(reverse("bad_request"))
+        self.assertEqual(response.status_code, 400)
+        self.assertTemplateUsed(response, "weather/400.html")
+
+    def test_400_page_displays_message(self):
+        """TC-091: 400 page contains the expected heading and message."""
+        response = self.client.get(reverse("bad_request"))
+        self.assertContains(response, "Bad Request", status_code=400)
+        self.assertContains(
+            response,
+            "The request couldn't be understood by the server.",
+            status_code=400,
+        )
+        self.assertContains(response, "Return Home", status_code=400)
+
+    # --- Error handlers wired in config ---
+
+    def test_error_handlers_point_to_views(self):
+        """TC-092: Django error handlers reference the correct views."""
+        import config.urls as urlconf
+
+        self.assertEqual(urlconf.handler404, "weather.views.page_not_found")
+        self.assertEqual(urlconf.handler500, "weather.views.server_error")
+        self.assertEqual(
+            urlconf.handler403, "weather.views.permission_denied"
+        )
+        self.assertEqual(urlconf.handler400, "weather.views.bad_request")

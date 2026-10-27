@@ -359,3 +359,23 @@ def remove_favorite_city(request, favorite_id):
     )
 
     return redirect("favorites")
+
+
+def page_not_found(request, exception=None):
+    """Render a user-friendly 404 page when a URL is not found."""
+    return render(request, "weather/404.html", status=404)
+
+
+def server_error(request):
+    """Render a user-friendly 500 page when a server error occurs."""
+    return render(request, "weather/500.html", status=500)
+
+
+def permission_denied(request, exception=None):
+    """Render a user-friendly 403 page when access is forbidden."""
+    return render(request, "weather/403.html", status=403)
+
+
+def bad_request(request, exception=None):
+    """Render a user-friendly 400 page when the request is malformed."""
+    return render(request, "weather/400.html", status=400)
