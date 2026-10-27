@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CitySearchForm, RegistrationForm
-from .models import WeatherData, FavoriteCity, City
+from .models import FavoriteCity, City
 
 from .services import (
     get_weather_data,
@@ -21,6 +21,11 @@ from .services import (
     calculate_forecast_statistics,
     generate_weather_insights,
     analyze_weather_history,
+    save_weather_search,
+    prepare_forecast_chart_data,
+    prepare_humidity_chart_data,
+    get_user_weather_history,
+    get_user_favorite_cities,
 )
 
 
@@ -48,17 +53,9 @@ def home(request):
             else:
                 weather = parse_weather_data(data)
 
-                WeatherData.objects.create(
+                save_weather_search(
                     user=request.user if request.user.is_authenticated else None,
-                    city=weather["city"],
-                    country=weather["country"],
-                    temperature=weather["temperature"],
-                    feels_like=weather["feels_like"],
-                    humidity=weather["humidity"],
-                    pressure=weather["pressure"],
-                    description=weather["description"],
-                    wind_speed=weather["wind_speed"],
-                    clouds=weather["clouds"],
+                    weather_data=weather,
                 )
 
                 forecast_data = get_forecast_data(city)
@@ -83,36 +80,16 @@ def home(request):
                             parsed_forecast
                         ),
                     }
-                    forecast_chart = {
-                        "labels": [
-                            entry["datetime"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                        "temperatures": [
-                            entry["temperature"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                    }
-                    humidity_chart = {
-                        "labels": [
-                            entry["datetime"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                        "humidities": [
-                            entry["humidity"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                    }
+                    forecast_chart = prepare_forecast_chart_data(
+                        parsed_forecast
+                    )
+                    humidity_chart = prepare_humidity_chart_data(
+                        parsed_forecast
+                    )
 
 
-    if request.user.is_authenticated:
-        history = WeatherData.objects.filter(user=request.user)
-        favorites = FavoriteCity.objects.filter(
-            user=request.user
-        ).order_by("city")
-    else:
-        history = WeatherData.objects.none()
-        favorites = FavoriteCity.objects.none()
+    history = get_user_weather_history(request.user)
+    favorites = get_user_favorite_cities(request.user)
 
 
     latest_searches = history[:10]
