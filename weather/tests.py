@@ -1,5 +1,6 @@
 import io
 import os
+import requests
 import secrets
 import tempfile
 from datetime import date, datetime
@@ -8,10 +9,16 @@ from django.core.management import call_command
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from weather.models import WeatherData, FavoriteCity, City
-from weather.services import analyze_weather_history, generate_weather_insights
+from weather.services import (
+    analyze_weather_history,
+    generate_weather_insights,
+    get_weather_data,
+    MAX_RETRIES,
+    REQUEST_TIMEOUT,
+)
 from weather.management.commands.import_cities import Command
 
 
@@ -1360,3 +1367,99 @@ class WeatherEmptyStateTests(TestCase):
         self.assertContains(response, "—°C")
         self.assertContains(response, "—%")
         self.assertContains(response, "— m/s")
+
+
+class WeatherApiServiceTests(TestCase):
+    """Tests for OpenWeatherMap service request handling (WT-053).
+
+    Covers retry behavior, timeout application, and normalized error responses.
+    """
+
+    def _mock_response(self, status_code=200, json_data=None):
+        response = Mock()
+        response.status_code = status_code
+        response.json.return_value = json_data or {}
+        response.raise_for_status = Mock()
+        return response
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_retries_on_timeout_then_succeeds(
+        self, mock_get, mock_sleep
+    ):
+        """TC-045: Transient timeouts are retried before returning data."""
+        mock_get.side_effect = [
+            requests.exceptions.Timeout(),
+            requests.exceptions.Timeout(),
+            self._mock_response(200, {"name": "London"}),
+        ]
+        result = get_weather_data("London")
+        self.assertEqual(result, {"name": "London"})
+        self.assertEqual(mock_get.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_returns_normalized_error_after_timeout_retries_exhausted(
+        self, mock_get, mock_sleep
+    ):
+        """TC-046: Timeout error is normalized after retries are exhausted."""
+        mock_get.side_effect = requests.exceptions.Timeout()
+        result = get_weather_data("London")
+        self.assertEqual(result, {"error": "Weather service request timed out."})
+        self.assertEqual(mock_get.call_count, MAX_RETRIES + 1)
+
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_applies_configured_timeout(self, mock_get):
+        """TC-047: The configured request timeout is passed to requests.get."""
+        mock_get.return_value = self._mock_response(200, {"name": "London"})
+        get_weather_data("London")
+        _, kwargs = mock_get.call_args
+        self.assertEqual(kwargs["timeout"], REQUEST_TIMEOUT)
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_retries_retryable_http_error_then_errors(
+        self, mock_get, mock_sleep
+    ):
+        """TC-048: Retryable HTTP 502 errors are retried then normalized to an error."""
+        def http_error_502():
+            exc = requests.exceptions.HTTPError()
+            response = Mock()
+            response.status_code = 502
+            exc.response = response
+            return exc
+
+        mock_get.side_effect = [http_error_502(), http_error_502(), http_error_502()]
+        result = get_weather_data("London")
+        self.assertEqual(result, {"error": "Weather service error (HTTP 502)."})
+        self.assertEqual(mock_get.call_count, MAX_RETRIES + 1)
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_non_retryable_http_error_returns_immediately(
+        self, mock_get, mock_sleep
+    ):
+        """TC-049: Non-retryable HTTP 401 returns immediately without retrying."""
+        def http_error_401():
+            exc = requests.exceptions.HTTPError()
+            response = Mock()
+            response.status_code = 401
+            exc.response = response
+            return exc
+
+        mock_get.side_effect = http_error_401()
+        result = get_weather_data("London")
+        self.assertEqual(result, {"error": "Weather service error (HTTP 401)."})
+        self.assertEqual(mock_get.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_404_returns_city_not_found_without_retry(
+        self, mock_get
+    ):
+        """TC-050: HTTP 404 returns "City not found." without retrying."""
+        mock_get.return_value = self._mock_response(404)
+        result = get_weather_data("Nowhere")
+        self.assertEqual(result, {"error": "City not found."})
+        self.assertEqual(mock_get.call_count, 1)

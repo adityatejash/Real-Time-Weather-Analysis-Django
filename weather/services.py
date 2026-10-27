@@ -1,4 +1,5 @@
 import math
+import time
 import requests
 from datetime import datetime, timedelta
 
@@ -7,8 +8,57 @@ from django.utils import timezone
 
 from .models import WeatherData
 
+WEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+FORECAST_BASE_URL = "https://api.openweathermap.org/data/2.5/forecast"
+REQUEST_TIMEOUT = getattr(settings, "WEATHER_API_TIMEOUT", 10)
+MAX_RETRIES = 2
+RETRY_BACKOFF = 1  # seconds between retries
 
-BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+_RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
+
+
+def _openweathermap_request(url, params):
+    """Call an OpenWeatherMap endpoint with retries and normalized error handling.
+
+    Returns the parsed JSON dict on success, or {"error": <message>} on failure.
+    All failure paths (timeout, connection error, HTTP error) return a consistent
+    {"error": ...} dict so callers can handle errors uniformly.
+    """
+    last_error = "Unable to connect to the weather service."
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+
+            if response.status_code == 404:
+                return {"error": "City not found."}
+
+            response.raise_for_status()
+            return response.json()
+
+        except requests.exceptions.Timeout:
+            last_error = "Weather service request timed out."
+            if attempt >= MAX_RETRIES:
+                return {"error": last_error}
+            time.sleep(RETRY_BACKOFF * (attempt + 1))
+            continue
+
+        except requests.exceptions.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in _RETRYABLE_STATUSES and attempt < MAX_RETRIES:
+                last_error = f"Weather service error (HTTP {status}). Retrying..."
+                time.sleep(RETRY_BACKOFF * (attempt + 1))
+                continue
+            last_error = (
+                "Unable to connect to the weather service."
+                if status is None
+                else f"Weather service error (HTTP {status})."
+            )
+            return {"error": last_error}
+
+        except requests.exceptions.RequestException:
+            return {"error": "Unable to connect to the weather service."}
+
+    return {"error": last_error}
 
 
 def get_weather_data(city):
@@ -17,32 +67,7 @@ def get_weather_data(city):
         "appid": settings.WEATHER_API_KEY,
         "units": "metric",
     }
-
-    try:
-        response = requests.get(
-            BASE_URL,
-            params=params,
-            timeout=10,
-        )
-
-        if response.status_code == 404:
-            return {
-                "error": "City not found."
-            }
-
-        response.raise_for_status()
-
-        return response.json()
-
-    except requests.exceptions.Timeout:
-        return {
-            "error": "Weather service request timed out."
-        }
-
-    except requests.exceptions.RequestException:
-        return {
-            "error": "Unable to connect to the weather service."
-        }
+    return _openweathermap_request(WEATHER_BASE_URL, params)
 
 
 def parse_weather_data(data):
@@ -61,38 +86,12 @@ def parse_weather_data(data):
 
 
 def get_forecast_data(city):
-    forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
     params = {
         "q": city,
         "appid": settings.WEATHER_API_KEY,
         "units": "metric",
     }
-
-    try:
-        response = requests.get(
-            forecast_url,
-            params=params,
-            timeout=10,
-        )
-
-        if response.status_code == 404:
-            return {
-                "error": "City not found."
-            }
-
-        response.raise_for_status()
-
-        return response.json()
-
-    except requests.exceptions.Timeout:
-        return {
-            "error": "Weather service request timed out."
-        }
-
-    except requests.exceptions.RequestException:
-        return {
-            "error": "Unable to connect to the weather service."
-        }
+    return _openweathermap_request(FORECAST_BASE_URL, params)
 
 
 def parse_forecast_data(data):
