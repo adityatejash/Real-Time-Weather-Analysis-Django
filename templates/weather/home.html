@@ -480,50 +480,6 @@ Weather Dashboard — WeatherLab
         </div>
     </section>
 
-    <!-- Favorites -->
-    {% if user.is_authenticated %}
-    <section class="section panel favorites-section">
-        <div class="section-body">
-            <div class="section-head">
-                <h2 class="section-title">My Favorite Cities</h2>
-                <p class="section-subtitle">Your saved weather locations</p>
-            </div>
-            {% for favorite in favorites %}
-                <div class="favorite-card">
-                    <div>
-                        <h3>{{ favorite.city }}</h3>
-                        {% if favorite.country %}
-                            <p>{{ favorite.country }}</p>
-                        {% endif %}
-                    </div>
-                    <div class="favorite-actions">
-                        <a
-                            href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
-                            class="btn btn--primary btn--compact"
-                        >
-                            Open Weather
-                        </a>
-                        <form
-                            method="post"
-                            action="{% url 'remove_favorite_city' favorite.id %}"
-                        >
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn--secondary btn--compact">
-                                Remove
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            {% empty %}
-                <div class="empty-state">
-                    <p>You haven't saved any favorite cities yet.</p>
-                    <p>Search for a city and add it to your favorites.</p>
-                </div>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
 </div>
 
 {% endblock %}
