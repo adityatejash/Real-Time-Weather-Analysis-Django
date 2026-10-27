@@ -1649,3 +1649,219 @@ class WeatherUtilsTests(TestCase):
     def test_humidity_boolean(self):
         """TC-082: Boolean humidity returns Data unavailable."""
         self.assertEqual(humidity_comfort_level(True), "Data unavailable")
+
+
+class ErrorPageTests(TestCase):
+    """Tests for custom user-friendly error pages (WT-055).
+
+    Covers 400, 403, 404, and 500 error pages: status codes, templates,
+    rendered content, URL route accessibility, and handler wiring.
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+    # --- 404 Page Not Found ---
+
+    def test_404_page_returns_status_and_template(self):
+        """TC-083: 404 page returns 404 status and uses 404 template."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "weather/404.html")
+
+    def test_404_page_displays_message(self):
+        """TC-084: 404 page contains the expected heading and message."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertContains(response, "Page Not Found", status_code=404)
+        self.assertContains(
+            response,
+            "The page you're looking for doesn't exist.",
+            status_code=404,
+        )
+        self.assertContains(response, "Return Home", status_code=404)
+
+    def test_404_page_home_link_resolves(self):
+        """TC-085: 404 page Return Home link points to home URL."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertContains(response, reverse("home"), status_code=404)
+
+    # --- 500 Server Error ---
+
+    def test_500_page_returns_status_and_template(self):
+        """TC-086: 500 page returns 500 status and uses 500 template."""
+        response = self.client.get(reverse("server_error"))
+        self.assertEqual(response.status_code, 500)
+        self.assertTemplateUsed(response, "weather/500.html")
+
+    def test_500_page_displays_message(self):
+        """TC-087: 500 page contains the expected heading and message."""
+        response = self.client.get(reverse("server_error"))
+        self.assertContains(response, "Server Error", status_code=500)
+        self.assertContains(
+            response, "Something went wrong on our end.", status_code=500
+        )
+        self.assertContains(response, "Return Home", status_code=500)
+
+    # --- 403 Permission Denied ---
+
+    def test_403_page_returns_status_and_template(self):
+        """TC-088: 403 page returns 403 status and uses 403 template."""
+        response = self.client.get(reverse("permission_denied"))
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "weather/403.html")
+
+    def test_403_page_displays_message(self):
+        """TC-089: 403 page contains the expected heading and message."""
+        response = self.client.get(reverse("permission_denied"))
+        self.assertContains(response, "Permission Denied", status_code=403)
+        self.assertContains(
+            response, "You don't have permission to view this page.", status_code=403
+        )
+        self.assertContains(response, "Return Home", status_code=403)
+
+    # --- 400 Bad Request ---
+
+    def test_400_page_returns_status_and_template(self):
+        """TC-090: 400 page returns 400 status and uses 400 template."""
+        response = self.client.get(reverse("bad_request"))
+        self.assertEqual(response.status_code, 400)
+        self.assertTemplateUsed(response, "weather/400.html")
+
+    def test_400_page_displays_message(self):
+        """TC-091: 400 page contains the expected heading and message."""
+        response = self.client.get(reverse("bad_request"))
+        self.assertContains(response, "Bad Request", status_code=400)
+        self.assertContains(
+            response,
+            "The request couldn't be understood by the server.",
+            status_code=400,
+        )
+        self.assertContains(response, "Return Home", status_code=400)
+
+    # --- Error handlers wired in config ---
+
+    def test_error_handlers_point_to_views(self):
+        """TC-092: Django error handlers reference the correct views."""
+        import config.urls as urlconf
+
+        self.assertEqual(urlconf.handler404, "weather.views.page_not_found")
+        self.assertEqual(urlconf.handler500, "weather.views.server_error")
+        self.assertEqual(
+            urlconf.handler403, "weather.views.permission_denied"
+        )
+        self.assertEqual(urlconf.handler400, "weather.views.bad_request")
+
+
+class FavoriteCityRedirectTests(TestCase):
+    """Regression test for Bug 1: add_favorite_city must preserve weather data.
+
+    Previously the view redirected to plain ``home`` without the ``?city=``
+    query parameter, so the home view skipped the weather API fetch and the
+    weather data vanished after adding a favorite.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="fav_redirect_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("add_favorite_city")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_redirects_home_with_city_param(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-093: Adding a favorite redirects to home with ?city= so weather persists."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        response = self.client.post(self.url, {"city": "London", "country": "GB"})
+        self.assertRedirects(response, reverse("home") + "?city=London")
+
+
+class RecentSearchDedupTests(TestCase):
+    """Regression test for Bug 2: recent searches must not show duplicate cities.
+
+    Previously ``latest_searches = history[:10`` returned every
+    WeatherData record, so the same city searched multiple times appeared
+    repeatedly. Recent searches are now deduplicated by city
+    (case-insensitive), keeping the most recent record per city.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="dedup_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+
+        self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
+        self.t2 = timezone.make_aware(datetime(2026, 1, 15, 11, 0, 0))
+        self.t3 = timezone.make_aware(datetime(2026, 1, 15, 12, 0, 0))
+        self.t4 = timezone.make_aware(datetime(2026, 1, 15, 13, 0, 0))
+
+        r1 = WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=15.0, feels_like=14.0,
+            humidity=60, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20,
+        )
+        r2 = WeatherData.objects.create(
+            user=self.user,
+            city="london", country="GB", temperature=16.0, feels_like=15.0,
+            humidity=55, pressure=1013, description="partly cloudy",
+            wind_speed=4.0, clouds=40,
+        )
+        r3 = WeatherData.objects.create(
+            user=self.user,
+            city="LONDON", country="GB", temperature=17.0, feels_like=16.0,
+            humidity=50, pressure=1010, description="rain",
+            wind_speed=5.0, clouds=90,
+        )
+        r4 = WeatherData.objects.create(
+            user=self.user,
+            city="Paris", country="FR", temperature=20.0, feels_like=19.0,
+            humidity=70, pressure=1020, description="snow",
+            wind_speed=2.0, clouds=100,
+        )
+
+        WeatherData.objects.filter(pk=r1.pk).update(searched_at=self.t1)
+        WeatherData.objects.filter(pk=r2.pk).update(searched_at=self.t2)
+        WeatherData.objects.filter(pk=r3.pk).update(searched_at=self.t3)
+        WeatherData.objects.filter(pk=r4.pk).update(searched_at=self.t4)
+
+    def test_latest_searches_deduplicated_by_city_case_insensitive(
+        self,
+    ):
+        """TC-094: Recent searches deduplicate by city (case-insensitive), most recent kept."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        latest = list(response.context["latest_searches"])
+        # 4 records but only 2 unique cities (London/LONDON/london collapse to one)
+        self.assertEqual(len(latest), 2)
+        city_names_lower = [r.city.lower() for r in latest]
+        self.assertEqual(city_names_lower.count("london"), 1)
+        self.assertEqual(city_names_lower.count("paris"), 1)
+        # Ordering is -searched_at: Paris (t4) most recent, then LONDON (t3)
+        self.assertEqual(latest[0].city, "Paris")
+        self.assertEqual(latest[1].city, "LONDON")
