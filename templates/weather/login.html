@@ -10,14 +10,6 @@
             <h1>Welcome Back</h1>
             <p>Log in to your WeatherLab account.</p>
 
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="message" role="status">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-
             <form method="post" class="auth-form">
                 {% csrf_token %}
 

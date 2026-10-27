@@ -1865,3 +1865,91 @@ class RecentSearchDedupTests(TestCase):
         # Ordering is -searched_at: Paris (t4) most recent, then LONDON (t3)
         self.assertEqual(latest[0].city, "Paris")
         self.assertEqual(latest[1].city, "LONDON")
+
+
+class FavoriteMessageTests(TestCase):
+    """Regression test for BUG-006: notification shown after adding favorite city.
+
+    Previously add_favorite_city set Django messages but base.html did not
+    render them, so users saw no confirmation after adding a favorite.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="fav_msg_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("add_favorite_city")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_shows_success_message(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-095: Adding a favorite shows a success flash message."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        response = self.client.post(
+            self.url,
+            {"city": "London", "country": "GB"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "London added to your favorites.")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_already_exists_shows_info_message(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-096: Adding an already-favorited city shows an info flash message."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        # First add
+        self.client.post(
+            self.url,
+            {"city": "London", "country": "GB"},
+            follow=True,
+        )
+        # Second add - should show "already in favorites" message
+        response = self.client.post(
+            self.url,
+            {"city": "London", "country": "GB"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "London is already in your favorites.")
