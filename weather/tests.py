@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
-from weather.models import WeatherData, City
+from weather.models import WeatherData, FavoriteCity, City
 from weather.services import analyze_weather_history, generate_weather_insights
 from weather.management.commands.import_cities import Command
 
@@ -1065,6 +1065,39 @@ class CityModelTests(TestCase):
         cities = list(City.objects.all())
         self.assertEqual(cities[0].name, "Large")
         self.assertEqual(cities[1].name, "Small")
+
+    def test_city_population_has_db_index(self):
+        """TC-044: City population field has a database index."""
+        self.assertTrue(City._meta.get_field("population").db_index)
+
+
+class WeatherDataModelIndexTests(TestCase):
+    """TC-042: WeatherData model indexes for user-scoped history queries."""
+
+    def test_weatherdata_country_has_db_index(self):
+        self.assertTrue(WeatherData._meta.get_field("country").db_index)
+
+    def test_weatherdata_composite_indexes(self):
+        index_names = {index.name for index in WeatherData._meta.indexes}
+        self.assertIn("weatherdata_user_city_idx", index_names)
+        self.assertIn("weatherdata_user_searched_idx", index_names)
+
+
+class FavoriteCityModelIndexTests(TestCase):
+    """TC-043: FavoriteCity model indexes for user-scoped favorite queries."""
+
+    def test_favoritecity_city_has_db_index(self):
+        self.assertTrue(FavoriteCity._meta.get_field("city").db_index)
+
+    def test_favoritecity_country_has_db_index(self):
+        self.assertTrue(FavoriteCity._meta.get_field("country").db_index)
+
+    def test_favoritecity_created_at_has_db_index(self):
+        self.assertTrue(FavoriteCity._meta.get_field("created_at").db_index)
+
+    def test_favoritecity_composite_index(self):
+        index_names = {index.name for index in FavoriteCity._meta.indexes}
+        self.assertIn("favoritecity_user_created_idx", index_names)
 
 
 class CityAutocompleteTests(TestCase):
