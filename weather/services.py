@@ -305,6 +305,68 @@ def generate_weather_insights(current_weather, parsed_forecast):
     }
 
 
+def save_weather_search(user, weather_data):
+    """Create and return a WeatherData record from parsed weather data.
+
+    Args:
+        user: The user performing the search (may be None for anonymous).
+        weather_data: Dict with keys city, country, temperature, feels_like,
+            humidity, pressure, description, wind_speed, clouds.
+    """
+    return WeatherData.objects.create(
+        user=user,
+        city=weather_data["city"],
+        country=weather_data["country"],
+        temperature=weather_data["temperature"],
+        feels_like=weather_data["feels_like"],
+        humidity=weather_data["humidity"],
+        pressure=weather_data["pressure"],
+        description=weather_data["description"],
+        wind_speed=weather_data["wind_speed"],
+        clouds=weather_data["clouds"],
+    )
+
+
+def prepare_forecast_chart_data(parsed_forecast):
+    """Return forecast chart labels and temperatures from parsed forecast data."""
+    return {
+        "labels": [
+            entry["datetime"] for entry in parsed_forecast["forecast"]
+        ],
+        "temperatures": [
+            entry["temperature"] for entry in parsed_forecast["forecast"]
+        ],
+    }
+
+
+def prepare_humidity_chart_data(parsed_forecast):
+    """Return humidity chart labels and humidities from parsed forecast data."""
+    return {
+        "labels": [
+            entry["datetime"] for entry in parsed_forecast["forecast"]
+        ],
+        "humidities": [
+            entry["humidity"] for entry in parsed_forecast["forecast"]
+        ],
+    }
+
+
+def get_user_weather_history(user):
+    """Return WeatherData queryset scoped to the given user."""
+    if user and user.is_authenticated:
+        return WeatherData.objects.filter(user=user)
+    return WeatherData.objects.none()
+
+
+def get_user_favorite_cities(user):
+    """Return FavoriteCity queryset scoped to the given user, ordered by city."""
+    from .models import FavoriteCity
+
+    if user and user.is_authenticated:
+        return FavoriteCity.objects.filter(user=user).order_by("city")
+    return FavoriteCity.objects.none()
+
+
 def analyze_weather_history(
     city=None,
     start_date=None,
