@@ -19,6 +19,22 @@ from weather.services import (
     MAX_RETRIES,
     REQUEST_TIMEOUT,
 )
+from weather.utils import (
+    beaufort_scale,
+    celsius_to_fahrenheit,
+    celsius_to_kelvin,
+    categorize_weather_condition,
+    fahrenheit_to_celsius,
+    format_weather_datetime,
+    hpa_to_inhg,
+    humidity_comfort_level,
+    inhg_to_hpa,
+    kelvin_to_celsius,
+    kmh_to_mps,
+    mps_to_kmh,
+    mps_to_mph,
+    mph_to_mps,
+)
 from weather.management.commands.import_cities import Command
 
 
@@ -1463,3 +1479,173 @@ class WeatherApiServiceTests(TestCase):
         result = get_weather_data("Nowhere")
         self.assertEqual(result, {"error": "City not found."})
         self.assertEqual(mock_get.call_count, 1)
+
+
+class WeatherUtilsTests(TestCase):
+    """Tests for weather utility functions (WT-054).
+
+    Covers temperature/wind/pressure conversion, weather condition
+    categorization, date formatting, Beaufort scale, and humidity comfort.
+    """
+
+    # --- Temperature conversion ---
+
+    def test_celsius_to_fahrenheit(self):
+        """TC-051: Celsius to Fahrenheit conversion."""
+        self.assertEqual(celsius_to_fahrenheit(0), 32.0)
+        self.assertEqual(celsius_to_fahrenheit(100), 212.0)
+
+    def test_fahrenheit_to_celsius(self):
+        """TC-052: Fahrenheit to Celsius conversion."""
+        self.assertEqual(fahrenheit_to_celsius(32), 0.0)
+        self.assertEqual(fahrenheit_to_celsius(212), 100.0)
+
+    def test_celsius_to_kelvin(self):
+        """TC-053: Celsius to Kelvin conversion."""
+        self.assertEqual(celsius_to_kelvin(0), 273.15)
+        self.assertEqual(celsius_to_kelvin(-273.15), 0.0)
+
+    def test_kelvin_to_celsius(self):
+        """TC-054: Kelvin to Celsius conversion."""
+        self.assertEqual(kelvin_to_celsius(273.15), 0.0)
+        self.assertEqual(kelvin_to_celsius(373.15), 100.0)
+
+    def test_temperature_conversion_none(self):
+        """TC-055: Temperature conversion returns None for None input."""
+        self.assertIsNone(celsius_to_fahrenheit(None))
+        self.assertIsNone(fahrenheit_to_celsius(None))
+        self.assertIsNone(celsius_to_kelvin(None))
+        self.assertIsNone(kelvin_to_celsius(None))
+
+    # --- Wind speed conversion ---
+
+    def test_mps_to_kmh(self):
+        """TC-056: Meters per second to kilometers per hour."""
+        self.assertEqual(mps_to_kmh(10), 36.0)
+
+    def test_mps_to_mph(self):
+        """TC-057: Meters per second to miles per hour."""
+        self.assertAlmostEqual(mps_to_mph(10), 22.3694, places=4)
+
+    def test_kmh_to_mps(self):
+        """TC-058: Kilometers per hour to meters per second."""
+        self.assertEqual(kmh_to_mps(36), 10.0)
+
+    def test_mph_to_mps(self):
+        """TC-059: Miles per hour to meters per second."""
+        self.assertAlmostEqual(mph_to_mps(22.3694), 10.0, places=4)
+
+    def test_wind_conversion_none(self):
+        """TC-060: Wind conversion returns None for None input."""
+        self.assertIsNone(mps_to_kmh(None))
+        self.assertIsNone(mps_to_mph(None))
+        self.assertIsNone(kmh_to_mps(None))
+        self.assertIsNone(mph_to_mps(None))
+
+    # --- Pressure conversion ---
+
+    def test_hpa_to_inhg(self):
+        """TC-061: Hectopascals to inches of mercury."""
+        self.assertAlmostEqual(hpa_to_inhg(1013.25), 29.92, places=2)
+
+    def test_inhg_to_hpa(self):
+        """TC-062: Inches of mercury to hectopascals."""
+        self.assertAlmostEqual(
+            inhg_to_hpa(hpa_to_inhg(1013.25)), 1013.25, places=2
+        )
+
+    def test_pressure_conversion_none(self):
+        """TC-063: Pressure conversion returns None for None input."""
+        self.assertIsNone(hpa_to_inhg(None))
+        self.assertIsNone(inhg_to_hpa(None))
+
+    # --- Weather condition categorization ---
+
+    def test_categorize_clear(self):
+        """TC-064: Clear sky categorizes as clear."""
+        self.assertEqual(categorize_weather_condition("clear sky", "01d"), "clear")
+
+    def test_categorize_cloudy(self):
+        """TC-065: Cloudy categorizes as cloudy."""
+        self.assertEqual(categorize_weather_condition("overcast clouds", "04d"), "cloudy")
+
+    def test_categorize_rain(self):
+        """TC-066: Rain categorizes as rain."""
+        self.assertEqual(categorize_weather_condition("moderate rain", "10d"), "rain")
+
+    def test_categorize_thunderstorm(self):
+        """TC-067: Thunderstorm categorizes as thunderstorm."""
+        self.assertEqual(categorize_weather_condition("thunderstorm", "11d"), "thunderstorm")
+
+    def test_categorize_snow(self):
+        """TC-068: Snow categorizes as snow."""
+        self.assertEqual(categorize_weather_condition("snow", "13n"), "snow")
+
+    def test_categorize_mist(self):
+        """TC-069: Mist categorizes as mist."""
+        self.assertEqual(categorize_weather_condition("mist", "50d"), "mist")
+
+    def test_categorize_unknown(self):
+        """TC-070: Unknown input categorizes as unknown."""
+        self.assertEqual(categorize_weather_condition("", ""), "unknown")
+        self.assertEqual(categorize_weather_condition(None, None), "unknown")
+
+    # --- Date formatting ---
+
+    def test_format_weather_datetime(self):
+        """TC-071: Datetime string formats for display."""
+        self.assertEqual(
+            format_weather_datetime("2021-01-07 12:00:00"),
+            "Jan 07, 12:00 PM",
+        )
+
+    def test_format_weather_datetime_invalid(self):
+        """TC-072: Invalid datetime returns Time unavailable."""
+        self.assertEqual(format_weather_datetime("not-a-date"), "Time unavailable")
+
+    def test_format_weather_datetime_none(self):
+        """TC-073: None datetime returns Time unavailable."""
+        self.assertEqual(format_weather_datetime(None), "Time unavailable")
+
+    # --- Beaufort scale ---
+
+    def test_beaufort_calm(self):
+        """TC-074: Zero wind speed is Calm."""
+        self.assertEqual(
+            beaufort_scale(0), (0, "Calm", "Calm; smoke rises vertically")
+        )
+
+    def test_beaufort_fresh_breeze(self):
+        """TC-075: 10 m/s is Fresh breeze."""
+        self.assertEqual(beaufort_scale(10)[0], 5)
+        self.assertEqual(beaufort_scale(10)[1], "Fresh breeze")
+
+    def test_beaufort_none(self):
+        """TC-076: None wind speed returns (None, None, None)."""
+        self.assertEqual(beaufort_scale(None), (None, None, None))
+
+    def test_beaufort_negative(self):
+        """TC-077: Negative wind speed returns (None, None, None)."""
+        self.assertEqual(beaufort_scale(-5), (None, None, None))
+
+    # --- Humidity comfort ---
+
+    def test_humidity_low(self):
+        """TC-078: Low humidity returns Low."""
+        self.assertEqual(humidity_comfort_level(20), "Low")
+
+    def test_humidity_comfortable(self):
+        """TC-079: Comfortable humidity returns Comfortable."""
+        self.assertEqual(humidity_comfort_level(50), "Comfortable")
+
+    def test_humidity_high(self):
+        """TC-080: High humidity returns High."""
+        self.assertEqual(humidity_comfort_level(80), "High")
+
+    def test_humidity_none(self):
+        """TC-081: None humidity returns Data unavailable."""
+        self.assertEqual(humidity_comfort_level(None), "Data unavailable")
+
+    def test_humidity_boolean(self):
+        """TC-082: Boolean humidity returns Data unavailable."""
+        self.assertEqual(humidity_comfort_level(True), "Data unavailable")
