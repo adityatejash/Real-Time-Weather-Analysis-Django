@@ -12,14 +12,6 @@
         </div>
     </section>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="message" role="status">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
     <section class="section panel">
         <div class="section-body">
             {% for favorite in favorites %}

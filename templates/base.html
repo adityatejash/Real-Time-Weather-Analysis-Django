@@ -84,6 +84,13 @@
     </header>
 
     <main id="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message" role="status">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
         {% block content %}
         {% endblock %}
     </main>
