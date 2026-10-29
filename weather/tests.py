@@ -3,7 +3,7 @@ import os
 import requests
 import secrets
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from django.core.management import call_command
 from django.test import TestCase, Client, override_settings
@@ -2007,3 +2007,119 @@ class DatabaseQueryOptimizationTests(TestCase):
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("favorites", response.context)
+
+
+class WeatherCacheTests(TestCase):
+    """Regression tests for API request caching (WT-057).
+
+    Verifies that the home view reuses a recent WeatherData record
+    (within the cache TTL) instead of calling the OpenWeatherMap API,
+    and falls back to the API when the cache is empty or expired.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="cache_user", password="testpass123"
+        )
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+        self.t_recent = timezone.now() - timedelta(minutes=5)
+        self.t_expired = timezone.now() - timedelta(hours=2)
+
+    def _weather_payload(self):
+        return {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 20.0,
+                "feels_like": 19.5,
+                "humidity": 50,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+
+    def _forecast_payload(self):
+        return {
+            "list": [
+                {
+                    "dt": 1610000000,
+                    "dt_txt": "2021-01-07 12:00:00",
+                    "main": {
+                        "temp": 22.0,
+                        "feels_like": 21.5,
+                        "humidity": 60,
+                    },
+                    "weather": [{"description": "clear sky", "icon": "01d"}],
+                    "wind": {"speed": 3.0},
+                    "clouds": {"all": 20},
+                }
+            ],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_cache_hit_skips_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-100: A recent cached record skips the OpenWeatherMap weather API call."""
+        WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=20.0, feels_like=19.5,
+            humidity=50, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20, icon="01d",
+        )
+        WeatherData.objects.filter(city__iexact="London").update(searched_at=self.t_recent)
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API must NOT be called on a cache hit.
+        mock_get_weather.assert_not_called()
+        # Forecast API is still called.
+        mock_get_forecast.assert_called_once()
+        weather = response.context["weather"]
+        self.assertEqual(weather["city"], "London")
+        self.assertEqual(weather["temperature"], 20.0)
+        self.assertEqual(weather["icon"], "01d")
+        self.assertIsNone(response.context["error"])
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_cache_miss_calls_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-101: No cached record triggers the OpenWeatherMap weather API call."""
+        mock_get_weather.return_value = self._weather_payload()
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with("London")
+        mock_get_forecast.assert_called_once()
+        # A new WeatherData record should have been saved.
+        self.assertTrue(
+            WeatherData.objects.filter(user=self.user, city__iexact="London").exists()
+        )
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_expired_cache_calls_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-102: An expired cached record (older than TTL) triggers the API."""
+        WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=10.0, feels_like=9.0,
+            humidity=60, pressure=1010, description="rain",
+            wind_speed=5.0, clouds=90, icon="10d",
+        )
+        WeatherData.objects.filter(city__iexact="London").update(searched_at=self.t_expired)
+        mock_get_weather.return_value = self._weather_payload()
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with("London")
+        # A fresh record should have been saved (cache was expired).
+        self.assertEqual(
+            WeatherData.objects.filter(user=self.user, city__iexact="London").count(), 2
+        )

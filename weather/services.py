@@ -11,6 +11,7 @@ from .models import WeatherData
 WEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_BASE_URL = "https://api.openweathermap.org/data/2.5/forecast"
 REQUEST_TIMEOUT = getattr(settings, "WEATHER_API_TIMEOUT", 10)
+WEATHER_CACHE_TTL = getattr(settings, "WEATHER_CACHE_TTL", 1800)
 MAX_RETRIES = 2
 RETRY_BACKOFF = 1  # seconds between retries
 
@@ -323,6 +324,7 @@ def save_weather_search(user, weather_data):
         description=weather_data["description"],
         wind_speed=weather_data["wind_speed"],
         clouds=weather_data["clouds"],
+        icon=weather_data.get("icon", ""),
     )
 
 
@@ -364,6 +366,42 @@ def get_user_favorite_cities(user):
     if user and user.is_authenticated:
         return FavoriteCity.objects.filter(user=user).order_by("city")
     return FavoriteCity.objects.none()
+
+
+def get_cached_weather_data(city, user):
+    """Return cached weather data dict if a recent record exists, else None.
+
+    Avoids unnecessary OpenWeatherMap API calls by reusing a WeatherData
+    record saved within the cache TTL for the same city and user.
+    """
+    if not city:
+        return None
+
+    cutoff = timezone.now() - timedelta(seconds=WEATHER_CACHE_TTL)
+    queryset = WeatherData.objects.filter(
+        city__iexact=city.strip(),
+        searched_at__gte=cutoff,
+    )
+    if user is not None:
+        queryset = queryset.filter(user=user)
+    else:
+        queryset = queryset.filter(user__isnull=True)
+
+    record = queryset.order_by("-searched_at").first()
+    if record:
+        return {
+            "city": record.city,
+            "country": record.country,
+            "temperature": record.temperature,
+            "feels_like": record.feels_like,
+            "humidity": record.humidity,
+            "pressure": record.pressure,
+            "description": record.description,
+            "wind_speed": record.wind_speed,
+            "clouds": record.clouds,
+            "icon": record.icon,
+        }
+    return None
 
 
 def analyze_weather_history(

@@ -20,6 +20,7 @@ class WeatherData(models.Model):
     description = models.CharField(max_length=255)
     wind_speed = models.FloatField()
     clouds = models.IntegerField()
+    icon = models.CharField(max_length=10, blank=True, default="")
     searched_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
