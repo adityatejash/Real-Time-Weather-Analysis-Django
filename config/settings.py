@@ -23,6 +23,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 WEATHER_API_TIMEOUT = int(os.getenv("WEATHER_API_TIMEOUT", "10"))
 WEATHER_CACHE_TTL = int(os.getenv("WEATHER_CACHE_TTL", "1800"))
+WEATHER_CACHE_SHORT_TTL = int(os.getenv("WEATHER_CACHE_SHORT_TTL", "300"))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/

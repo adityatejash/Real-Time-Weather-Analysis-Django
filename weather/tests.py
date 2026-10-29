@@ -6,6 +6,7 @@ import tempfile
 from datetime import date, datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from django.core.management import call_command
+from django.core.cache import cache
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -42,6 +43,7 @@ class WeatherChartTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     @patch('weather.views.get_weather_data')
     @patch('weather.views.get_forecast_data')
@@ -169,6 +171,7 @@ class WeatherInsightsTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     def _forecast(self, entries):
         return {"forecast": entries}
@@ -916,6 +919,7 @@ class WeatherSearchOwnershipTests(TestCase):
             password="TestPassword123!",
         )
         self.client = Client()
+        cache.clear()
 
     @patch("weather.views.get_weather_data")
     def test_saved_search_is_associated_with_logged_in_user(
@@ -999,6 +1003,7 @@ class WeatherSearchExperienceTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     @patch('weather.views.get_weather_data')
     @patch('weather.views.get_forecast_data')
@@ -1335,6 +1340,7 @@ class WeatherEmptyStateTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     def test_home_page_shows_empty_history_state(self):
         """TC-039: Home page shows empty state when there is no search history."""
@@ -2026,6 +2032,7 @@ class WeatherCacheTests(TestCase):
         self.url = reverse("home")
         self.t_recent = timezone.now() - timedelta(minutes=5)
         self.t_expired = timezone.now() - timedelta(hours=2)
+        cache.clear()
 
     def _weather_payload(self):
         return {
@@ -2123,3 +2130,164 @@ class WeatherCacheTests(TestCase):
         self.assertEqual(
             WeatherData.objects.filter(user=self.user, city__iexact="London").count(), 2
         )
+
+
+class WeatherDjangoCacheTests(TestCase):
+    """Regression tests for Django framework caching (WT-058).
+
+    Verifies that the home view uses Django's cache framework (L1) for
+    current weather and forecast data, reducing OpenWeatherMap API calls,
+    complementing WT-057's model-based current-weather cache (L2).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="django_cache_user", password="testpass123"
+        )
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+        cache.clear()
+
+    def _weather_payload(self):
+        return {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 20.0,
+                "feels_like": 19.5,
+                "humidity": 50,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+
+    def _forecast_payload(self):
+        return {
+            "list": [
+                {
+                    "dt": 1610000000,
+                    "dt_txt": "2021-01-07 12:00:00",
+                    "main": {
+                        "temp": 22.0,
+                        "feels_like": 21.5,
+                        "humidity": 60,
+                    },
+                    "weather": [{"description": "clear sky", "icon": "01d"}],
+                    "wind": {"speed": 3.0},
+                    "clouds": {"all": 20},
+                }
+            ],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_django_cache_hit_skips_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-103: Django cache hit for current weather skips the weather API call."""
+        from weather.services import set_cached_weather_django
+
+        cached = {
+            "city": "London",
+            "country": "GB",
+            "temperature": 20.0,
+            "feels_like": 19.5,
+            "humidity": 50,
+            "pressure": 1015,
+            "description": "clear sky",
+            "wind_speed": 3.5,
+            "clouds": 20,
+            "icon": "01d",
+        }
+        set_cached_weather_django("London", cached, self.user)
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API must NOT be called on a Django cache hit.
+        mock_get_weather.assert_not_called()
+        # Forecast API is still called (forecast not cached).
+        mock_get_forecast.assert_called_once()
+        weather = response.context["weather"]
+        self.assertEqual(weather["city"], "London")
+        self.assertEqual(weather["temperature"], 20.0)
+        self.assertIsNone(response.context["error"])
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_django_forecast_cache_hit_skips_forecast_api(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-104: Django cache hit for forecast skips the forecast API call."""
+        from weather.services import set_cached_forecast_django
+
+        cached_forecast = {
+            "city": "London",
+            "country": "GB",
+            "forecast": [
+                {
+                    "datetime": "2021-01-07 12:00:00",
+                    "temperature": 22.0,
+                    "feels_like": 21.5,
+                    "humidity": 60,
+                    "description": "clear sky",
+                    "icon": "01d",
+                    "wind_speed": 3.0,
+                    "clouds": 20,
+                }
+            ],
+        }
+        set_cached_forecast_django("London", cached_forecast)
+        mock_get_weather.return_value = self._weather_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API is called (current weather not cached).
+        mock_get_weather.assert_called_once_with("London")
+        # Forecast API must NOT be called on a Django cache hit.
+        mock_get_forecast.assert_not_called()
+        forecast = response.context["forecast"]
+        self.assertIsNotNone(forecast)
+        self.assertEqual(forecast["city"], "London")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_django_cache_miss_uses_model_cache(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-105: Django cache miss falls through to model cache (no API call)."""
+        from weather.services import get_cached_weather_django
+
+        # Django cache is empty (cleared in setUp).
+        # Model cache has a recent record for London.
+        WeatherData.objects.create(
+            user=self.user,
+            city="London",
+            country="GB",
+            temperature=18.0,
+            feels_like=17.5,
+            humidity=55,
+            pressure=1012,
+            description="partly cloudy",
+            wind_speed=4.0,
+            clouds=40,
+            icon="02d",
+        )
+        WeatherData.objects.filter(city__iexact="London").update(
+            searched_at=timezone.now() - timedelta(minutes=5)
+        )
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API must NOT be called; model cache (L2) is used instead.
+        mock_get_weather.assert_not_called()
+        # Forecast API is still called.
+        mock_get_forecast.assert_called_once()
+        weather = response.context["weather"]
+        self.assertEqual(weather["city"], "London")
+        self.assertEqual(weather["temperature"], 18.0)
+        # Django cache should now be populated from the model cache hit.
+        self.assertIsNotNone(get_cached_weather_django("London", self.user))
