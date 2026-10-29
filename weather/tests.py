@@ -1953,3 +1953,57 @@ class FavoriteMessageTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "London is already in your favorites.")
+
+
+class DatabaseQueryOptimizationTests(TestCase):
+    """Regression guards for query optimizations (WT-056).
+
+    Verifies that optimized code paths use the expected number of queries
+    and that dead code paths (unused context keys) were removed.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="opt_user", password="testpass123"
+        )
+        self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
+        self.t2 = timezone.make_aware(datetime(2026, 1, 15, 14, 0, 0))
+
+        WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=10.0, feels_like=9.0,
+            humidity=60, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20,
+        )
+        WeatherData.objects.create(
+            user=self.user,
+            city="Paris", country="FR", temperature=5.0, feels_like=4.0,
+            humidity=70, pressure=1020, description="snow",
+            wind_speed=2.0, clouds=100,
+        )
+        WeatherData.objects.filter(pk=1).update(searched_at=self.t1)
+        WeatherData.objects.filter(pk=2).update(searched_at=self.t2)
+
+    def test_analyze_weather_history_single_query(self):
+        """TC-097: analyze_weather_history evaluates the queryset once (one query)."""
+        with self.assertNumQueries(1):
+            result = analyze_weather_history(user=self.user)
+        self.assertEqual(result["record_count"], 2)
+        self.assertEqual(result["min_temperature"], 5.0)
+        self.assertEqual(result["max_temperature"], 10.0)
+        self.assertEqual(result["avg_temperature"], 7.5)
+
+    def test_home_view_excludes_removed_city_weather(self):
+        """TC-098: home view context no longer includes dead city_weather key."""
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("city_weather", response.context)
+
+    def test_home_view_excludes_removed_favorites(self):
+        """TC-099: home view context no longer includes unused favorites key."""
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("favorites", response.context)

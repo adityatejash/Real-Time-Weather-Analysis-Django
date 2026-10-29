@@ -27,7 +27,6 @@ from .services import (
     prepare_forecast_chart_data,
     prepare_humidity_chart_data,
     get_user_weather_history,
-    get_user_favorite_cities,
 )
 
 
@@ -89,27 +88,24 @@ def home(request):
                         parsed_forecast
                     )
 
-
     history = get_user_weather_history(request.user)
-    favorites = get_user_favorite_cities(request.user)
 
-
-    # Deduplicate recent searches by city (case-insensitive), keeping most recent
+    # Recent searches: distinct cities (case-insensitive), most recent first,
+    # capped at 10. Loads only the fields needed and stops once 10 unique
+    # cities are collected, instead of materializing the whole history.
     seen_cities = set()
-    deduped_history = []
-    for record in history:
+    latest_searches = []
+    for record in (
+        get_user_weather_history(request.user)
+        .order_by("-searched_at", "-pk")
+        .only("city", "searched_at")
+    ):
         key = record.city.lower()
         if key not in seen_cities:
             seen_cities.add(key)
-            deduped_history.append(record)
-    latest_searches = deduped_history[:10]
-    city_weather = None
-    searched_city = request.GET.get("city")
-
-    if searched_city and request.user.is_authenticated:
-        city_weather = history.filter(
-            city__iexact=searched_city
-        )
+            latest_searches.append(record)
+        if len(latest_searches) >= 10:
+            break
 
     return render(
         request,
@@ -120,14 +116,12 @@ def home(request):
             "error": error,
             "history": history,
             "latest_searches": latest_searches,
-            "city_weather": city_weather,
             "forecast": forecast,
             "forecast_chart": forecast_chart,
             "humidity_chart": humidity_chart,
             "forecast_error": forecast_error,
             "statistics": statistics,
             "insights": insights,
-            "favorites": favorites,
         },
     )
 
