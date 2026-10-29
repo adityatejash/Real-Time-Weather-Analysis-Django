@@ -399,10 +399,13 @@ def analyze_weather_history(
     queryset = queryset.order_by("searched_at", "pk")
 
     city_name = city.strip() if city else ""
-    record_count = queryset.count()
+    # Evaluate the queryset once and reuse it, avoiding a separate count()
+    # query plus a second query to iterate the records.
+    records = list(queryset)
+    record_count = len(records)
 
     valid_entries = []
-    for record in queryset:
+    for record in records:
         temp = _valid_numeric(record.temperature)
         if temp is not None:
             valid_entries.append((record, temp))
