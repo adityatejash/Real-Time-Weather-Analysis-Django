@@ -28,6 +28,10 @@ from .services import (
     prepare_humidity_chart_data,
     get_user_weather_history,
     get_cached_weather_data,
+    get_cached_weather_django,
+    set_cached_weather_django,
+    get_cached_forecast_django,
+    set_cached_forecast_django,
 )
 
 
@@ -49,8 +53,12 @@ def home(request):
             city = form.cleaned_data["city"]
             user = request.user if request.user.is_authenticated else None
 
-            # Check cache first to avoid unnecessary OpenWeatherMap API call.
-            cached_weather = get_cached_weather_data(city, user)
+            # Check Django cache (L1) first, then model cache (L2), then API (L3).
+            cached_weather = get_cached_weather_django(city, user)
+            if cached_weather is None:
+                cached_weather = get_cached_weather_data(city, user)
+                if cached_weather is not None:
+                    set_cached_weather_django(city, cached_weather, user)
             if cached_weather:
                 weather = cached_weather
             else:
@@ -61,16 +69,26 @@ def home(request):
                 else:
                     weather = parse_weather_data(data)
                     save_weather_search(user=user, weather_data=weather)
+                    set_cached_weather_django(city, weather, user)
 
             if weather is not None:
-                forecast_data = get_forecast_data(city)
-
-                if "error" in forecast_data:
-                    forecast_error = forecast_data["error"]
-                    insights = generate_weather_insights(weather, {})
+                # Check Django cache for forecast data before calling API.
+                cached_forecast = get_cached_forecast_django(city)
+                if cached_forecast is not None:
+                    parsed_forecast = cached_forecast
+                    forecast_error = None
                 else:
-                    parsed_forecast = parse_forecast_data(forecast_data)
+                    forecast_data = get_forecast_data(city)
 
+                    if "error" in forecast_data:
+                        forecast_error = forecast_data["error"]
+                        insights = generate_weather_insights(weather, {})
+                        parsed_forecast = None
+                    else:
+                        parsed_forecast = parse_forecast_data(forecast_data)
+                        set_cached_forecast_django(city, parsed_forecast)
+
+                if parsed_forecast:
                     statistics = calculate_forecast_statistics(
                         parsed_forecast
                     )

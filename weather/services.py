@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 from .models import WeatherData
@@ -12,6 +13,7 @@ WEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_BASE_URL = "https://api.openweathermap.org/data/2.5/forecast"
 REQUEST_TIMEOUT = getattr(settings, "WEATHER_API_TIMEOUT", 10)
 WEATHER_CACHE_TTL = getattr(settings, "WEATHER_CACHE_TTL", 1800)
+WEATHER_CACHE_SHORT_TTL = getattr(settings, "WEATHER_CACHE_SHORT_TTL", 300)
 MAX_RETRIES = 2
 RETRY_BACKOFF = 1  # seconds between retries
 
@@ -402,6 +404,54 @@ def get_cached_weather_data(city, user):
             "icon": record.icon,
         }
     return None
+
+
+def _django_cache_key(prefix, city, user=None):
+    """Build a Django cache key for weather data.
+
+    Keys are scoped by prefix (weather/forecast), normalized city, and user
+    (authenticated users by pk, anonymous users by a fixed marker).
+    """
+    key = f"{prefix}:{city.strip().lower()}"
+    if user is not None:
+        key += f":{user.pk}"
+    else:
+        key += ":anonymous"
+    return key
+
+
+def get_cached_weather_django(city, user=None):
+    """Return cached current-weather dict from Django's cache, else None."""
+    if not city:
+        return None
+    return cache.get(_django_cache_key("weather", city, user))
+
+
+def set_cached_weather_django(city, data, user=None, ttl=None):
+    """Store parsed current-weather data in Django's cache.
+
+    Defaults to WEATHER_CACHE_SHORT_TTL seconds.
+    """
+    if not city or not data:
+        return
+    cache.set(_django_cache_key("weather", city, user), data, ttl or WEATHER_CACHE_SHORT_TTL)
+
+
+def get_cached_forecast_django(city):
+    """Return cached forecast dict from Django's cache, else None."""
+    if not city:
+        return None
+    return cache.get(_django_cache_key("forecast", city))
+
+
+def set_cached_forecast_django(city, data, ttl=None):
+    """Store parsed forecast data in Django's cache.
+
+    Defaults to WEATHER_CACHE_SHORT_TTL seconds.
+    """
+    if not city or not data:
+        return
+    cache.set(_django_cache_key("forecast", city), data, ttl or WEATHER_CACHE_SHORT_TTL)
 
 
 def analyze_weather_history(
