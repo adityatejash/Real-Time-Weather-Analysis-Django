@@ -27,6 +27,7 @@ from .services import (
     prepare_forecast_chart_data,
     prepare_humidity_chart_data,
     get_user_weather_history,
+    get_cached_weather_data,
 )
 
 
@@ -46,19 +47,22 @@ def home(request):
 
         if form.is_valid():
             city = form.cleaned_data["city"]
+            user = request.user if request.user.is_authenticated else None
 
-            data = get_weather_data(city)
-
-            if "error" in data:
-                error = data["error"]
+            # Check cache first to avoid unnecessary OpenWeatherMap API call.
+            cached_weather = get_cached_weather_data(city, user)
+            if cached_weather:
+                weather = cached_weather
             else:
-                weather = parse_weather_data(data)
+                data = get_weather_data(city)
 
-                save_weather_search(
-                    user=request.user if request.user.is_authenticated else None,
-                    weather_data=weather,
-                )
+                if "error" in data:
+                    error = data["error"]
+                else:
+                    weather = parse_weather_data(data)
+                    save_weather_search(user=user, weather_data=weather)
 
+            if weather is not None:
                 forecast_data = get_forecast_data(city)
 
                 if "error" in forecast_data:
