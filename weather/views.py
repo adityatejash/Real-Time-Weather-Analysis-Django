@@ -249,6 +249,8 @@ def history_view(request):
             user=request.user,
         )
 
+    history = get_user_weather_history(request.user)
+
     return render(
         request,
         "weather/history.html",
@@ -258,6 +260,7 @@ def history_view(request):
             "end_date": end_date_str,
             "result": result,
             "validation_error": validation_error,
+            "history": history,
         },
     )
 
