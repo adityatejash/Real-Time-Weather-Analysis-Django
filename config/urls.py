@@ -17,6 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+# Custom error handlers — user-friendly error pages.
+handler404 = "weather.views.page_not_found"
+handler500 = "weather.views.server_error"
+handler403 = "weather.views.permission_denied"
+handler400 = "weather.views.bad_request"
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('weather.urls')),

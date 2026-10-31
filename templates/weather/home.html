@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}
 Weather Dashboard — WeatherLab
@@ -14,230 +15,282 @@ Weather Dashboard — WeatherLab
     </div>
 
     <!-- City Search -->
-    <section class="section panel" aria-label="City search">
+    <section class="section" aria-label="City search">
         <div class="section-body">
+            <h1 class="search-section-heading">Search for a City</h1>
+            <p class="search-section-subtitle">Get real-time weather data, forecasts and insights</p>
+
             {% if error %}
-            <div class="message message--error" role="alert" id="searchError">
+            <div class="message message--error" role="alert" id="searchError" style="margin-bottom: var(--dp-space-lg);">
                 <strong>Search error:</strong> {{ error }}
             </div>
             {% endif %}
 
-            <form method="get" class="search-form" id="citySearchForm">
-                <div class="form-field search-form-field" role="search" aria-label="City search">
-                    <label for="city">{{ form.city.label }}</label>
-                    <div class="autocomplete-wrapper" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-owns="citySuggestions" aria-controls="citySuggestions">
-                        <input
-                            type="text"
-                            name="city"
-                            id="city"
-                            placeholder="Enter city name"
-                            required
-                            autocomplete="off"
-                            role="searchbox"
-                            aria-autocomplete="list"
-                            aria-controls="citySuggestions"
-                            aria-activedescendant=""
-                        />
+            <div class="search-layout">
+                <div>
+                    <form method="get" class="search-form" id="citySearchForm">
+                        <div class="form-field search-form-field" role="search" aria-label="City search">
+                            <label for="city" class="visually-hidden">{{ form.city.label }}</label>
+                            <div class="autocomplete-wrapper" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-owns="citySuggestions" aria-controls="citySuggestions">
+                                <div class="search-input-wrapper" style="flex:1; min-width:0; position:relative;">
+                                    <svg class="search-input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    <input
+                                        type="text"
+                                        name="city"
+                                        id="city"
+                                        placeholder="Enter city name"
+                                        required
+                                        autocomplete="off"
+                                        role="searchbox"
+                                        aria-autocomplete="list"
+                                        aria-controls="citySuggestions"
+                                        aria-activedescendant=""
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    class="btn--compact autocomplete-clear"
+                                    id="cityClear"
+                                    aria-label="Clear city search"
+                                    style="display: none;"
+                                >
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            <div
+                                id="citySuggestions"
+                                role="listbox"
+                                aria-label="City suggestions"
+                                class="autocomplete-dropdown"
+                                style="display: none;"
+                            >
+                                <div
+                                    class="autocomplete-message"
+                                    role="status"
+                                    aria-live="polite"
+                                    id="autocompleteStatus"
+                                ></div>
+                            </div>
+                        </div>
+                            {% for error in form.city.errors %}
+                            <p class="field-error">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn--primary" id="searchButton">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="m21 21-4.3-4.3"/>
+                            </svg>
+                            Search
+                        </button>
+                    </form>
+                </div>
+
+                {% if latest_searches %}
+                <div class="recent-searches">
+                    <p class="recent-searches-label">Recent Searches</p>
+                    <div class="recent-searches-list">
+                        {% for item in latest_searches %}
                         <button
                             type="button"
-                            class="btn--compact autocomplete-clear"
-                            id="cityClear"
-                            aria-label="Clear city search"
-                            style="display: none;"
+                            class="recent-search-chip"
+                            onclick="showWeatherLoading(); document.getElementById('city').value = '{{ item.city|escapejs }}'; document.getElementById('citySearchForm').submit();"
                         >
-                            <span aria-hidden="true">×</span>
+                            <span class="chip-city-icon" data-city="{{ item.city|escape }}" data-country="{{ item.country|escape }}" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                                    <circle cx="12" cy="10" r="3"/>
+                                </svg>
+                            </span>
+                            <span class="chip-city-name">{{ item.city }}</span>
+                            <span class="chip-country-code">{{ item.country }}</span>
                         </button>
-                    <div
-                        id="citySuggestions"
-                        role="listbox"
-                        aria-label="City suggestions"
-                        class="autocomplete-dropdown"
-                        style="display: none;"
-                    >
-                        <div
-                            class="autocomplete-message"
-                            role="status"
-                            aria-live="polite"
-                            id="autocompleteStatus"
-                        ></div>
+                        {% endfor %}
                     </div>
                 </div>
-                    {% for error in form.city.errors %}
-                    <p class="field-error">{{ error }}</p>
-                    {% endfor %}
-                </div>
-                <button type="submit" class="btn btn--primary" id="searchButton">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.3-4.3"/>
-                    </svg>
-                    Search
-                </button>
-            </form>
-
-            {% if latest_searches %}
-            <div class="recent-searches">
-                <p class="recent-searches-label">Recent searches</p>
-                <div class="recent-searches-list">
-                    {% for item in latest_searches %}
-                    <button
-                        type="button"
-                        class="recent-search-chip"
-                        onclick="showWeatherLoading(); document.getElementById('city').value = '{{ item.city|escapejs }}'; document.getElementById('citySearchForm').submit();"
-                    >
-                        {{ item.city }}
-                    </button>
-                    {% endfor %}
-                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </section>
 
-    <!-- Current Weather -->
+    <!-- Dashboard grid: tall sky panel (left) + stacked cards (right) -->
+    <div class="dash-grid{% if not weather %} dash-grid--solo{% endif %}" id="dashGrid"
+         {% if weather %}data-weather-fx data-icon="{{ weather.icon }}" data-desc="{{ weather.description }}" data-wind="{{ weather.wind_speed }}" data-city="{{ weather.city }}" data-country="{{ weather.country }}"{% endif %}>
+
+      {% if weather %}
+      <aside class="sky-panel" aria-label="Today at a glance">
+          <div class="sky-scene" aria-hidden="true">
+              <span class="sky-orb"></span>
+              <span class="sky-cloud sc1"></span><span class="sky-cloud sc2"></span><span class="sky-cloud sc3"></span><span class="sky-cloud sc4"></span>
+          </div>
+          <canvas class="fx-canvas" id="skyFx" aria-hidden="true"></canvas>
+          <div class="sky-info">
+              <span class="sky-label">Today</span>
+              <span class="sky-date">{% now "l, j F" %}</span>
+              <span class="sky-cond">{{ weather.description|title }}</span>
+              <span class="sky-temp">{{ weather.temperature }}°C</span>
+          </div>
+      </aside>
+      {% endif %}
+
+      <div class="dash-main">
+
+    <!-- Current Weather Hero -->
     {% if weather %}
-    <section class="section panel" aria-labelledby="current-weather-heading">
-        <div class="section-body">
-            <div class="section-head section-head--split">
-                <h2 id="current-weather-heading" class="section-title">Current Weather</h2>
+    <section class="section hero-section" aria-labelledby="current-weather-heading">
+        <div class="weather-hero-card" id="weatherHeroCard">
+            <!-- Dynamic city background -->
+            <div class="weather-hero-bg" id="weatherHeroBg">
+                <img
+                    id="cityBackgroundImg"
+                    src=""
+                    alt="{{ weather.city }} cityscape"
+                    loading="eager"
+                    decoding="async"
+                />
+            </div>
+            <canvas class="fx-canvas" id="heroFx" aria-hidden="true"></canvas>
+
+            <div class="weather-hero-content">
+                <div class="weather-hero-location-area">
+                    <div>
+                        <div class="weather-hero-icon">
+                            <img
+                                src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
+                                alt="{{ weather.description }}"
+                                width="88"
+                                height="88"
+                            >
+                        </div>
+                        <h2 id="current-weather-heading" class="weather-hero-location">
+                            {{ weather.city }}, {{ weather.country }}
+                        </h2>
+                        <p class="weather-hero-description">{{ weather.description|title }}</p>
+                    </div>
+                </div>
 
                 <div class="weather-hero-action">
+                    <span class="live-badge"><i aria-hidden="true"></i> Live</span>
+                    <span class="hero-updated" id="heroUpdated">Updated just now</span>
                     {% if user.is_authenticated %}
                         <form method="post" action="{% url 'add_favorite_city' %}" class="favorite-city-form">
                             {% csrf_token %}
                             <input type="hidden" name="city" value="{{ weather.city }}">
                             <input type="hidden" name="country" value="{{ weather.country }}">
-                            <button type="submit" class="btn btn--primary btn--compact">
+                            <button type="submit" class="btn btn--primary btn--compact" >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                                </svg>
                                 Add to Favorites
                             </button>
                         </form>
                     {% else %}
                         <p class="favorite-login-prompt">
-                            <a href="{% url 'login' %}">Log in</a> to save this city to your favorites.
+                            <a href="{% url 'login' %}" style="color:rgba(255,255,255,0.7);">Log in</a> to save favorites.
                         </p>
                     {% endif %}
                 </div>
-            </div>
 
-            <div class="weather-hero">
-                <div class="weather-hero-info">
-                    <div class="weather-hero-location">{{ weather.city }}, {{ weather.country }}</div>
-                    <p class="weather-hero-description">{{ weather.description|title }}</p>
-                    <div class="weather-hero-temp">
-                        <span class="temp-value">{{ weather.temperature }}°</span>
+                <div class="weather-hero-main">
+                    <div class="weather-hero-temp-group">
+                        <span class="temp-value">{{ weather.temperature }}°C</span>
                         <span class="temp-feels">Feels like {{ weather.feels_like }}°C</span>
                     </div>
                 </div>
 
-                <div class="weather-hero-icon">
-                    <img
-                        src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png"
-                        alt="{{ weather.description }}"
-                        width="96"
-                        height="96"
-                    >
-                </div>
-            </div>
+                <div class="weather-hero-metrics-area">
+                    <div class="hero-metrics-row">
+                        <div class="hero-metric">
+                            <div class="hero-metric-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                                </svg>
+                            </div>
+                            <div class="hero-metric-content">
+                                <span class="hero-metric-label">Humidity</span>
+                                <span class="hero-metric-value">{{ weather.humidity }}%</span>
+                            </div>
+                        </div>
 
-            <!-- Metric tiles -->
-            <div class="metrics-grid">
-                <div class="metric-tile">
-                    <div class="metric-icon metric-icon--live" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="4.93" y1="4.93" y2="4.93"/><line x1="19.07" x2="19.07" y1="19.07" y2="19.07"/><line x1="2.29" x2="2.29" y1="2.29" y2="2.29"/><line x1="21.71" x2="21.71" y1="21.71" y2="21.71"/>
-                        </svg>
-                    </div>
-                    <div class="metric-content">
-                        <div class="metric-label">Temperature</div>
-                        <div class="metric-value">{{ weather.temperature }}°C</div>
-                    </div>
-                </div>
+                        <div class="hero-metric">
+                            <div class="hero-metric-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><circle cx="12" cy="14" r="4"/>
+                                </svg>
+                            </div>
+                            <div class="hero-metric-content">
+                                <span class="hero-metric-label">Pressure</span>
+                                <span class="hero-metric-value">{{ weather.pressure }} hPa</span>
+                            </div>
+                        </div>
 
-                <div class="metric-tile">
-                    <div class="metric-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
-                        </svg>
-                    </div>
-                    <div class="metric-content">
-                        <div class="metric-label">Humidity</div>
-                        <div class="metric-value">{{ weather.humidity }}%</div>
-                    </div>
-                </div>
+                        <div class="hero-metric">
+                            <div class="hero-metric-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                                </svg>
+                            </div>
+                            <div class="hero-metric-content">
+                                <span class="hero-metric-label">Wind Speed</span>
+                                <span class="hero-metric-value">{{ weather.wind_speed }} km/h</span>
+                            </div>
+                        </div>
 
-                <div class="metric-tile">
-                    <div class="metric-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2v20"/><path d="m17 7-5-5-5 5"/><circle cx="12" cy="14" r="4"/>
-                        </svg>
-                    </div>
-                    <div class="metric-content">
-                        <div class="metric-label">Pressure</div>
-                        <div class="metric-value">{{ weather.pressure }} hPa</div>
-                    </div>
-                </div>
-
-                <div class="metric-tile">
-                    <div class="metric-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
-                        </svg>
-                    </div>
-                    <div class="metric-content">
-                        <div class="metric-label">Wind Speed</div>
-                        <div class="metric-value">{{ weather.wind_speed }} m/s</div>
-                    </div>
-                </div>
-
-                <div class="metric-tile">
-                    <div class="metric-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-                        </svg>
-                    </div>
-                    <div class="metric-content">
-                        <div class="metric-label">Cloudiness</div>
-                        <div class="metric-value">{{ weather.clouds }}%</div>
+                        <div class="hero-metric">
+                            <div class="hero-metric-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                                </svg>
+                            </div>
+                            <div class="hero-metric-content">
+                                <span class="hero-metric-label">Cloudiness</span>
+                                <span class="hero-metric-value">{{ weather.clouds }}%</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-
-        </div>
-    </section>
-    {% else %}
-    <section class="section panel">
-        <div class="section-body">
-            <h2 class="section-title">Current Weather</h2>
-            <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="4.93" y1="4.93" y2="4.93"/><line x1="19.07" x2="19.07" y1="19.07" y2="19.07"/><line x1="2.29" x2="2.29" y1="2.29" y2="2.29"/><line x1="21.71" x2="21.71" y1="21.71" y2="21.71"/>
-                </svg>
-                <p>Search for a city to view current weather.</p>
-            </div>
+            <span class="photo-credit" id="heroPhotoCredit" hidden>Photo: Wikipedia</span>
         </div>
     </section>
     {% endif %}
 
-    <!-- Forecast -->
+    <!-- 5-Day Forecast -->
     <section class="section panel" aria-labelledby="forecast-heading">
         <div class="section-body">
-            <h2 id="forecast-heading" class="section-title">Forecast</h2>
+            <div class="section-head section-head--split">
+                <h2 id="forecast-heading" class="section-title">
+                    <span class="section-title-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
+                        </svg>
+                    </span>
+                    5-Day Forecast
+                </h2>
+                {% if forecast %}
+                <a href="{% url 'weather_history' %}" class="view-details-link">View Details →</a>
+                {% endif %}
+            </div>
             {% if forecast %}
                 <div class="forecast-grid">
                     {% for entry in forecast.forecast %}
-                        <div class="forecast-card">
-                            <div class="forecast-date">{{ entry.date }}</div>
+                        <div class="forecast-card {% if forloop.first %}forecast-card--today{% endif %}">
+                            <div class="forecast-day-name">
+                                {% if forloop.first %}Today{% else %}{{ entry.date|date:"D" }}{% endif %}
+                            </div>
+                            <div class="forecast-date">{% if entry.date|date:"M j" %}{{ entry.date|date:"M j" }}{% else %}{{ entry.date }}{% endif %}</div>
                             <img
                                 src="https://openweathermap.org/img/wn/{{ entry.icon }}@2x.png"
                                 alt="{{ entry.description }}"
                                 class="forecast-icon"
-                                width="48"
-                                height="48"
+                                width="56"
+                                height="56"
                             >
-                            <div class="forecast-description">{{ entry.description|title }}</div>
                             <div class="forecast-temps">
                                 <span class="temp-high" title="Maximum temperature">{{ entry.max_temperature }}°</span>
-                                <span class="temp-separator">/</span>
+                                <span class="temp-separator"> / </span>
                                 <span class="temp-low" title="Minimum temperature">{{ entry.min_temperature }}°</span>
                             </div>
                         </div>
@@ -256,134 +309,159 @@ Weather Dashboard — WeatherLab
         </div>
     </section>
 
-    <!-- Weather Statistics -->
-    {% if statistics %}
-    <section class="section panel" aria-labelledby="stats-heading">
-        <div class="section-body">
-            <h2 id="stats-heading" class="section-title">Weather Statistics</h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
+    <!-- Weather Statistics & Insights — side by side -->
+    {% if statistics or insights %}
+    <div class="stats-insights-grid">
+        {% if statistics %}
+        <section class="section panel" aria-labelledby="stats-heading">
+            <div class="section-body">
+                <h2 id="stats-heading" class="section-title">
+                    <span class="section-title-icon" aria-hidden="true">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
+                            <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
                         </svg>
+                    </span>
+                    Weather Statistics
+                </h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.avg_temperature|default:"—" }}°C</div>
+                        <div class="stat-label">Avg Temperature</div>
                     </div>
-                    <div class="stat-value">{{ statistics.avg_temperature|default:"—" }}°C</div>
-                    <div class="stat-label">Avg Temperature</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/><line x1="20" x2="20" y1="7" y2="11"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/><line x1="20" x2="20" y1="7" y2="11"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.max_temperature|default:"—" }}°C</div>
+                        <div class="stat-label">Max Temperature</div>
                     </div>
-                    <div class="stat-value">{{ statistics.max_temperature|default:"—" }}°C</div>
-                    <div class="stat-label">Max Temperature</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/><line x1="18" x2="22" y1="9" y2="9"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.min_temperature|default:"—" }}°C</div>
+                        <div class="stat-label">Min Temperature</div>
                     </div>
-                    <div class="stat-value">{{ statistics.min_temperature|default:"—" }}°C</div>
-                    <div class="stat-label">Min Temperature</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.avg_humidity|default:"—" }}%</div>
+                        <div class="stat-label">Avg Humidity</div>
                     </div>
-                    <div class="stat-value">{{ statistics.avg_humidity|default:"—" }}%</div>
-                    <div class="stat-label">Avg Humidity</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ statistics.avg_wind_speed|default:"—" }} m/s</div>
+                        <div class="stat-label">Avg Wind Speed</div>
                     </div>
-                    <div class="stat-value">{{ statistics.avg_wind_speed|default:"—" }} m/s</div>
-                    <div class="stat-label">Avg Wind Speed</div>
                 </div>
             </div>
-        </div>
-    </section>
-    {% endif %}
+        </section>
+        {% endif %}
 
-    <!-- Weather Insights -->
-    {% if insights %}
-    <section class="section panel" aria-labelledby="insights-heading">
-        <div class="section-body">
-            <h2 id="insights-heading" class="section-title">Weather Insights</h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon stat-icon--live" aria-hidden="true">
+        {% if insights %}
+        <section class="section panel" aria-labelledby="insights-heading">
+            <div class="section-body">
+                <h2 id="insights-heading" class="section-title">
+                    <span class="section-title-icon" aria-hidden="true">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                            <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                            <path d="M9 18h6"/><path d="M10 22h4"/>
                         </svg>
+                    </span>
+                    Weather Insights
+                </h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon--live" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ insights.temperature_trend }}</div>
+                        <div class="stat-label">Temperature Trend</div>
                     </div>
-                    <div class="stat-value">{{ insights.temperature_trend }}</div>
-                    <div class="stat-label">Temperature Trend</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="5"/><line x1="12" x2="12" y1="1" y2="3"/><line x1="12" x2="12" y1="21" y2="23"/>
+                            </svg>
+                        </div>
+                        {% if insights.warmest_period %}
+                            <div class="stat-value">{{ insights.warmest_period.temperature }}°C</div>
+                            <div class="stat-label">Warmest Period</div>
+                            <div class="stat-datetime">{{ insights.warmest_period.datetime }}</div>
+                        {% else %}
+                            <div class="stat-value">—</div>
+                            <div class="stat-label">Warmest Period</div>
+                        {% endif %}
                     </div>
-                    {% if insights.warmest_period %}
-                        <div class="stat-value">{{ insights.warmest_period.temperature }}°C</div>
-                        <div class="stat-label">Warmest Period</div>
-                        <div class="stat-datetime">{{ insights.warmest_period.datetime }}</div>
-                    {% else %}
-                        <div class="stat-value">—</div>
-                        <div class="stat-label">Warmest Period</div>
-                    {% endif %}
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                            </svg>
+                        </div>
+                        {% if insights.coolest_period %}
+                            <div class="stat-value">{{ insights.coolest_period.temperature }}°C</div>
+                            <div class="stat-label">Coolest Period</div>
+                            <div class="stat-datetime">{{ insights.coolest_period.datetime }}</div>
+                        {% else %}
+                            <div class="stat-value">—</div>
+                            <div class="stat-label">Coolest Period</div>
+                        {% endif %}
                     </div>
-                    {% if insights.coolest_period %}
-                        <div class="stat-value">{{ insights.coolest_period.temperature }}°C</div>
-                        <div class="stat-label">Coolest Period</div>
-                        <div class="stat-datetime">{{ insights.coolest_period.datetime }}</div>
-                    {% else %}
-                        <div class="stat-value">—</div>
-                        <div class="stat-label">Coolest Period</div>
-                    {% endif %}
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ insights.humidity_observation }}</div>
+                        <div class="stat-label">Humidity Observation</div>
                     </div>
-                    <div class="stat-value">{{ insights.humidity_observation }}</div>
-                    <div class="stat-label">Humidity Observation</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-                        </svg>
+                    <div class="stat-card">
+                        <div class="stat-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-value">{{ insights.forecast_summary }}</div>
+                        <div class="stat-label">Forecast Summary</div>
                     </div>
-                    <div class="stat-value">{{ insights.forecast_summary }}</div>
-                    <div class="stat-label">Forecast Summary</div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
+        {% endif %}
+    </div>
     {% endif %}
 
     <!-- Charts: Temperature & Humidity -->
     <section class="section panel" aria-labelledby="trends-heading">
         <div class="section-body">
-            <h2 id="trends-heading" class="section-title">Trend Charts</h2>
+            <h2 id="trends-heading" class="section-title">
+                <span class="section-title-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </span>
+                Trend Charts
+            </h2>
             <div class="charts-grid">
                 <!-- Temperature Trends -->
                 <div class="chart-panel">
@@ -442,87 +520,8 @@ Weather Dashboard — WeatherLab
         </div>
     </section>
 
-    <!-- Search History -->
-    <section class="section panel" aria-labelledby="history-heading">
-        <div class="section-body">
-            <h2 id="history-heading" class="section-title">Search History</h2>
-            {% if history %}
-                <div class="history-grid">
-                    {% for item in history %}
-                        <div class="history-card">
-                            <div class="history-card-icon" aria-hidden="true">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-                                </svg>
-                            </div>
-                            <div class="history-card-body">
-                                <div class="history-card-city">{{ item.city }}, {{ item.country }}</div>
-                                <div class="history-card-detail">
-                                    {{ item.description|title }} &middot; Humidity {{ item.humidity }}% &middot; Wind {{ item.wind_speed }} m/s
-                                </div>
-                            </div>
-                            <div class="history-card-meta">
-                                <div class="history-card-temp">{{ item.temperature }}°C</div>
-                                <div class="history-card-time">{{ item.searched_at|date:"M d, H:i" }}</div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="empty-state">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
-                    </svg>
-                    <p>No weather searches yet.</p>
-                    <p>Use the search above to look up a city.</p>
-                </div>
-            {% endif %}
-        </div>
-    </section>
-
-    <!-- Favorites -->
-    {% if user.is_authenticated %}
-    <section class="section panel favorites-section">
-        <div class="section-body">
-            <div class="section-head">
-                <h2 class="section-title">My Favorite Cities</h2>
-                <p class="section-subtitle">Your saved weather locations</p>
-            </div>
-            {% for favorite in favorites %}
-                <div class="favorite-card">
-                    <div>
-                        <h3>{{ favorite.city }}</h3>
-                        {% if favorite.country %}
-                            <p>{{ favorite.country }}</p>
-                        {% endif %}
-                    </div>
-                    <div class="favorite-actions">
-                        <a
-                            href="{% url 'home' %}?city={{ favorite.city|urlencode }}"
-                            class="btn btn--primary btn--compact"
-                        >
-                            Open Weather
-                        </a>
-                        <form
-                            method="post"
-                            action="{% url 'remove_favorite_city' favorite.id %}"
-                        >
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn--secondary btn--compact">
-                                Remove
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            {% empty %}
-                <div class="empty-state">
-                    <p>You haven't saved any favorite cities yet.</p>
-                    <p>Search for a city and add it to your favorites.</p>
-                </div>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
+      </div><!-- /dash-main -->
+    </div><!-- /dash-grid -->
 
 </div>
 
@@ -551,7 +550,7 @@ Weather Dashboard — WeatherLab
 
         if (window.Chart) {
             Chart.defaults.font.family = fontFace;
-            Chart.defaults.color = rootStyles.getPropertyValue("--dp-color-text-reading").trim() || "#a6a9ad";
+            Chart.defaults.color = rootStyles.getPropertyValue("--dp-color-text-reading").trim() || "#a8b4d0";
             if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
                 Chart.defaults.animation = false;
             }
@@ -595,11 +594,11 @@ Weather Dashboard — WeatherLab
                         datasets: [{
                             label: "Temperature (°C)",
                             data: temps,
-                            borderColor: rootStyles.getPropertyValue("--dp-chart-temp-line").trim() || "#3fd6c6",
-                            backgroundColor: rootStyles.getPropertyValue("--dp-chart-temp-fill").trim() || "rgba(63,214,198,0.10)",
+                            borderColor: rootStyles.getPropertyValue("--dp-chart-temp-line").trim() || "#f59e0b",
+                            backgroundColor: rootStyles.getPropertyValue("--dp-chart-temp-fill").trim() || "rgba(245,158,11,0.10)",
                             borderWidth: 2,
                             pointRadius: 3,
-                            pointBackgroundColor: rootStyles.getPropertyValue("--dp-chart-temp-line").trim() || "#3fd6c6",
+                            pointBackgroundColor: rootStyles.getPropertyValue("--dp-chart-temp-line").trim() || "#f59e0b",
                             pointHoverRadius: 6,
                             pointHoverBackgroundColor: "#fff",
                             pointHoverBorderWidth: 2,
@@ -620,15 +619,17 @@ Weather Dashboard — WeatherLab
                                     usePointStyle: true,
                                     pointStyle: "circle",
                                     padding: 16,
-                                    font: { family: fontFace, size: 12, color: "#a6a9ad" }
+                                    font: { family: fontFace, size: 12, color: "#a8b4d0" }
                                 }
                             },
                             tooltip: {
-                                backgroundColor: "rgba(14, 14, 14, 0.92)",
+                                backgroundColor: "rgba(10, 14, 26, 0.92)",
                                 titleFont: { family: fontFace, size: 12 },
                                 bodyFont: { family: fontFace, size: 13, weight: "600" },
                                 padding: 10,
                                 cornerRadius: 8,
+                                borderColor: "rgba(79, 164, 247, 0.2)",
+                                borderWidth: 1,
                                 callbacks: {
                                     label: ctx => ` ${ctx.parsed.y}°C`
                                 }
@@ -637,13 +638,13 @@ Weather Dashboard — WeatherLab
                         scales: {
                             x: {
                                 title: { display: true, text: "Forecast Time", font: { family: fontFace, size: 12 } },
-                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11, color: "#8a8d91" } },
+                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11, color: "#6b7a9e" } },
                                 grid: { display: false }
                             },
                             y: {
                                 title: { display: true, text: "Temperature (°C)", font: { family: fontFace, size: 12 } },
-                                ticks: { font: { size: 11, color: "#8a8d91" } },
-                                grid: { color: "rgba(34, 34, 34, 0.6)" }
+                                ticks: { font: { size: 11, color: "#6b7a9e" } },
+                                grid: { color: "rgba(56, 78, 130, 0.15)" }
                             }
                         }
                     }
@@ -691,11 +692,11 @@ Weather Dashboard — WeatherLab
                         datasets: [{
                             label: "Humidity (%)",
                             data: humidities,
-                            borderColor: rootStyles.getPropertyValue("--dp-chart-humidity-line").trim() || "#a6a9ad",
-                            backgroundColor: rootStyles.getPropertyValue("--dp-chart-humidity-fill").trim() || "rgba(138,141,145,0.10)",
+                            borderColor: rootStyles.getPropertyValue("--dp-chart-humidity-line").trim() || "#4fa4f7",
+                            backgroundColor: rootStyles.getPropertyValue("--dp-chart-humidity-fill").trim() || "rgba(79,164,247,0.08)",
                             borderWidth: 2,
                             pointRadius: 3,
-                            pointBackgroundColor: rootStyles.getPropertyValue("--dp-chart-humidity-line").trim() || "#a6a9ad",
+                            pointBackgroundColor: rootStyles.getPropertyValue("--dp-chart-humidity-line").trim() || "#4fa4f7",
                             pointHoverRadius: 6,
                             pointHoverBackgroundColor: "#fff",
                             pointHoverBorderWidth: 2,
@@ -716,15 +717,17 @@ Weather Dashboard — WeatherLab
                                     usePointStyle: true,
                                     pointStyle: "circle",
                                     padding: 16,
-                                    font: { family: fontFace, size: 12, color: "#a6a9ad" }
+                                    font: { family: fontFace, size: 12, color: "#a8b4d0" }
                                 }
                             },
                             tooltip: {
-                                backgroundColor: "rgba(14, 14, 14, 0.92)",
+                                backgroundColor: "rgba(10, 14, 26, 0.92)",
                                 titleFont: { family: fontFace, size: 12 },
                                 bodyFont: { family: fontFace, size: 13, weight: "600" },
                                 padding: 10,
                                 cornerRadius: 8,
+                                borderColor: "rgba(79, 164, 247, 0.2)",
+                                borderWidth: 1,
                                 callbacks: {
                                     label: ctx => ` ${ctx.parsed.y}%`
                                 }
@@ -733,15 +736,15 @@ Weather Dashboard — WeatherLab
                         scales: {
                             x: {
                                 title: { display: true, text: "Forecast Time", font: { family: fontFace, size: 12 } },
-                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11, color: "#8a8d91" } },
+                                ticks: { maxTicksLimit: 8, maxRotation: 45, minRotation: 0, font: { size: 11, color: "#6b7a9e" } },
                                 grid: { display: false }
                             },
                             y: {
                                 min: 0,
                                 max: 100,
                                 title: { display: true, text: "Humidity (%)", font: { family: fontFace, size: 12 } },
-                                ticks: { font: { size: 11, color: "#8a8d91" } },
-                                grid: { color: "rgba(34, 34, 34, 0.6)" }
+                                ticks: { font: { size: 11, color: "#6b7a9e" } },
+                                grid: { color: "rgba(56, 78, 130, 0.15)" }
                             }
                         }
                     }
@@ -758,6 +761,9 @@ Weather Dashboard — WeatherLab
         initializeWeatherCharts();
     }
 </script>
+
+<!-- City background image logic -->
+<script src="{% static 'js/weatherlab-ui.js' %}"></script>
 
 <script>
     (function () {
@@ -801,12 +807,17 @@ Weather Dashboard — WeatherLab
         }
 
         function renderSuggestions(results) {
-            dropdown.querySelectorAll('[role="option"]').forEach(function (el) {
+            dropdown.querySelectorAll('[role="option"], .autocomplete-empty').forEach(function (el) {
                 el.remove();
             });
 
             if (!results || results.length === 0) {
                 setStatus("No cities found for your search.");
+                var empty = document.createElement("div");
+                empty.className = "autocomplete-empty";
+                empty.setAttribute("role", "presentation");
+                empty.textContent = "No cities found for your search.";
+                dropdown.appendChild(empty);
                 dropdown.style.display = "block";
                 combobox.setAttribute("aria-expanded", "true");
                 return;
@@ -825,14 +836,55 @@ Weather Dashboard — WeatherLab
                 button.dataset.lat = item.latitude;
                 button.dataset.lon = item.longitude;
 
-                var namePart = document.createElement("strong");
-                namePart.textContent = item.name;
-                var detailPart = document.createElement("span");
-                detailPart.className = "autocomplete-detail";
-                detailPart.textContent = item.display_name;
+                var parts = String(item.display_name || item.name).split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+                var country = item.country_name || (item.country && String(item.country).length > 2 ? item.country : "") ||
+                    (parts.length > 1 ? parts[parts.length - 1] : "");
+                var code = String(item.country_code || item.countryCode || (item.country && String(item.country).length === 2 ? item.country : "") || "").toLowerCase();
+                var regionParts = parts.slice(1);
+                if (regionParts.length > 1 && regionParts[regionParts.length - 1] === country) { regionParts.pop(); }
+                var region = regionParts.join(", ");
 
-                button.appendChild(namePart);
-                button.appendChild(detailPart);
+                var NS = "http://www.w3.org/2000/svg";
+                var pin = document.createElementNS(NS, "svg");
+                pin.setAttribute("class", "ac-pin");
+                pin.setAttribute("width", "22"); pin.setAttribute("height", "22");
+                pin.setAttribute("viewBox", "0 0 24 24"); pin.setAttribute("fill", "none");
+                pin.setAttribute("stroke", "currentColor"); pin.setAttribute("stroke-width", "2");
+                pin.setAttribute("stroke-linecap", "round"); pin.setAttribute("stroke-linejoin", "round");
+                pin.setAttribute("aria-hidden", "true");
+                pin.innerHTML = '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>';
+
+                var text = document.createElement("span");
+                text.className = "ac-text";
+                var namePart = document.createElement("span");
+                namePart.className = "ac-name";
+                namePart.textContent = item.name;
+                text.appendChild(namePart);
+                if (region) {
+                    var regionPart = document.createElement("span");
+                    regionPart.className = "ac-region";
+                    regionPart.textContent = region;
+                    text.appendChild(regionPart);
+                }
+
+                var right = document.createElement("span");
+                right.className = "ac-country";
+                if (/^[a-z]{2}$/.test(code)) {
+                    var flag = document.createElement("img");
+                    flag.className = "ac-flag";
+                    flag.src = "https://flagcdn.com/w40/" + code + ".png";
+                    flag.alt = "";
+                    flag.width = 28; flag.height = 20;
+                    flag.onerror = function () { flag.style.display = "none"; };
+                    right.appendChild(flag);
+                }
+                var countryName = document.createElement("span");
+                countryName.textContent = country;
+                right.appendChild(countryName);
+
+                button.appendChild(pin);
+                button.appendChild(text);
+                button.appendChild(right);
                 dropdown.appendChild(button);
             });
 

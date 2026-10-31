@@ -1,14 +1,67 @@
 import math
+import time
 import requests
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 from .models import WeatherData
 
+WEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+FORECAST_BASE_URL = "https://api.openweathermap.org/data/2.5/forecast"
+REQUEST_TIMEOUT = getattr(settings, "WEATHER_API_TIMEOUT", 10)
+WEATHER_CACHE_TTL = getattr(settings, "WEATHER_CACHE_TTL", 1800)
+WEATHER_CACHE_SHORT_TTL = getattr(settings, "WEATHER_CACHE_SHORT_TTL", 300)
+MAX_RETRIES = 2
+RETRY_BACKOFF = 1  # seconds between retries
 
-BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+_RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
+
+
+def _openweathermap_request(url, params):
+    """Call an OpenWeatherMap endpoint with retries and normalized error handling.
+
+    Returns the parsed JSON dict on success, or {"error": <message>} on failure.
+    All failure paths (timeout, connection error, HTTP error) return a consistent
+    {"error": ...} dict so callers can handle errors uniformly.
+    """
+    last_error = "Unable to connect to the weather service."
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+
+            if response.status_code == 404:
+                return {"error": "City not found."}
+
+            response.raise_for_status()
+            return response.json()
+
+        except requests.exceptions.Timeout:
+            last_error = "Weather service request timed out."
+            if attempt >= MAX_RETRIES:
+                return {"error": last_error}
+            time.sleep(RETRY_BACKOFF * (attempt + 1))
+            continue
+
+        except requests.exceptions.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status in _RETRYABLE_STATUSES and attempt < MAX_RETRIES:
+                last_error = f"Weather service error (HTTP {status}). Retrying..."
+                time.sleep(RETRY_BACKOFF * (attempt + 1))
+                continue
+            last_error = (
+                "Unable to connect to the weather service."
+                if status is None
+                else f"Weather service error (HTTP {status})."
+            )
+            return {"error": last_error}
+
+        except requests.exceptions.RequestException:
+            return {"error": "Unable to connect to the weather service."}
+
+    return {"error": last_error}
 
 
 def get_weather_data(city):
@@ -17,32 +70,7 @@ def get_weather_data(city):
         "appid": settings.WEATHER_API_KEY,
         "units": "metric",
     }
-
-    try:
-        response = requests.get(
-            BASE_URL,
-            params=params,
-            timeout=10,
-        )
-
-        if response.status_code == 404:
-            return {
-                "error": "City not found."
-            }
-
-        response.raise_for_status()
-
-        return response.json()
-
-    except requests.exceptions.Timeout:
-        return {
-            "error": "Weather service request timed out."
-        }
-
-    except requests.exceptions.RequestException:
-        return {
-            "error": "Unable to connect to the weather service."
-        }
+    return _openweathermap_request(WEATHER_BASE_URL, params)
 
 
 def parse_weather_data(data):
@@ -61,38 +89,12 @@ def parse_weather_data(data):
 
 
 def get_forecast_data(city):
-    forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
     params = {
         "q": city,
         "appid": settings.WEATHER_API_KEY,
         "units": "metric",
     }
-
-    try:
-        response = requests.get(
-            forecast_url,
-            params=params,
-            timeout=10,
-        )
-
-        if response.status_code == 404:
-            return {
-                "error": "City not found."
-            }
-
-        response.raise_for_status()
-
-        return response.json()
-
-    except requests.exceptions.Timeout:
-        return {
-            "error": "Weather service request timed out."
-        }
-
-    except requests.exceptions.RequestException:
-        return {
-            "error": "Unable to connect to the weather service."
-        }
+    return _openweathermap_request(FORECAST_BASE_URL, params)
 
 
 def parse_forecast_data(data):
@@ -305,6 +307,153 @@ def generate_weather_insights(current_weather, parsed_forecast):
     }
 
 
+def save_weather_search(user, weather_data):
+    """Create and return a WeatherData record from parsed weather data.
+
+    Args:
+        user: The user performing the search (may be None for anonymous).
+        weather_data: Dict with keys city, country, temperature, feels_like,
+            humidity, pressure, description, wind_speed, clouds.
+    """
+    return WeatherData.objects.create(
+        user=user,
+        city=weather_data["city"],
+        country=weather_data["country"],
+        temperature=weather_data["temperature"],
+        feels_like=weather_data["feels_like"],
+        humidity=weather_data["humidity"],
+        pressure=weather_data["pressure"],
+        description=weather_data["description"],
+        wind_speed=weather_data["wind_speed"],
+        clouds=weather_data["clouds"],
+        icon=weather_data.get("icon", ""),
+    )
+
+
+def prepare_forecast_chart_data(parsed_forecast):
+    """Return forecast chart labels and temperatures from parsed forecast data."""
+    return {
+        "labels": [
+            entry["datetime"] for entry in parsed_forecast["forecast"]
+        ],
+        "temperatures": [
+            entry["temperature"] for entry in parsed_forecast["forecast"]
+        ],
+    }
+
+
+def prepare_humidity_chart_data(parsed_forecast):
+    """Return humidity chart labels and humidities from parsed forecast data."""
+    return {
+        "labels": [
+            entry["datetime"] for entry in parsed_forecast["forecast"]
+        ],
+        "humidities": [
+            entry["humidity"] for entry in parsed_forecast["forecast"]
+        ],
+    }
+
+
+def get_user_weather_history(user):
+    """Return WeatherData queryset scoped to the given user."""
+    if user and user.is_authenticated:
+        return WeatherData.objects.filter(user=user)
+    return WeatherData.objects.none()
+
+
+def get_user_favorite_cities(user):
+    """Return FavoriteCity queryset scoped to the given user, ordered by city."""
+    from .models import FavoriteCity
+
+    if user and user.is_authenticated:
+        return FavoriteCity.objects.filter(user=user).order_by("city")
+    return FavoriteCity.objects.none()
+
+
+def get_cached_weather_data(city, user):
+    """Return cached weather data dict if a recent record exists, else None.
+
+    Avoids unnecessary OpenWeatherMap API calls by reusing a WeatherData
+    record saved within the cache TTL for the same city and user.
+    """
+    if not city:
+        return None
+
+    cutoff = timezone.now() - timedelta(seconds=WEATHER_CACHE_TTL)
+    queryset = WeatherData.objects.filter(
+        city__iexact=city.strip(),
+        searched_at__gte=cutoff,
+    )
+    if user is not None:
+        queryset = queryset.filter(user=user)
+    else:
+        queryset = queryset.filter(user__isnull=True)
+
+    record = queryset.order_by("-searched_at").first()
+    if record:
+        return {
+            "city": record.city,
+            "country": record.country,
+            "temperature": record.temperature,
+            "feels_like": record.feels_like,
+            "humidity": record.humidity,
+            "pressure": record.pressure,
+            "description": record.description,
+            "wind_speed": record.wind_speed,
+            "clouds": record.clouds,
+            "icon": record.icon,
+        }
+    return None
+
+
+def _django_cache_key(prefix, city, user=None):
+    """Build a Django cache key for weather data.
+
+    Keys are scoped by prefix (weather/forecast), normalized city, and user
+    (authenticated users by pk, anonymous users by a fixed marker).
+    """
+    key = f"{prefix}:{city.strip().lower()}"
+    if user is not None:
+        key += f":{user.pk}"
+    else:
+        key += ":anonymous"
+    return key
+
+
+def get_cached_weather_django(city, user=None):
+    """Return cached current-weather dict from Django's cache, else None."""
+    if not city:
+        return None
+    return cache.get(_django_cache_key("weather", city, user))
+
+
+def set_cached_weather_django(city, data, user=None, ttl=None):
+    """Store parsed current-weather data in Django's cache.
+
+    Defaults to WEATHER_CACHE_SHORT_TTL seconds.
+    """
+    if not city or not data:
+        return
+    cache.set(_django_cache_key("weather", city, user), data, ttl or WEATHER_CACHE_SHORT_TTL)
+
+
+def get_cached_forecast_django(city):
+    """Return cached forecast dict from Django's cache, else None."""
+    if not city:
+        return None
+    return cache.get(_django_cache_key("forecast", city))
+
+
+def set_cached_forecast_django(city, data, ttl=None):
+    """Store parsed forecast data in Django's cache.
+
+    Defaults to WEATHER_CACHE_SHORT_TTL seconds.
+    """
+    if not city or not data:
+        return
+    cache.set(_django_cache_key("forecast", city), data, ttl or WEATHER_CACHE_SHORT_TTL)
+
+
 def analyze_weather_history(
     city=None,
     start_date=None,
@@ -338,10 +487,13 @@ def analyze_weather_history(
     queryset = queryset.order_by("searched_at", "pk")
 
     city_name = city.strip() if city else ""
-    record_count = queryset.count()
+    # Evaluate the queryset once and reuse it, avoiding a separate count()
+    # query plus a second query to iterate the records.
+    records = list(queryset)
+    record_count = len(records)
 
     valid_entries = []
-    for record in queryset:
+    for record in records:
         temp = _valid_numeric(record.temperature)
         if temp is not None:
             valid_entries.append((record, temp))

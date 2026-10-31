@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}My Favorite Cities — WeatherLab{% endblock %}
 
 {% block content %}
 
-<div class="dashboard">
+<div class="dashboard dashboard--page">
     <section class="section" aria-labelledby="favorites-heading">
         <div class="section-body">
             <h1 id="favorites-heading">My Favorite Cities</h1>
@@ -12,19 +13,27 @@
         </div>
     </section>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="message" role="status">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
-    <section class="section panel">
+    <section class="section panel" aria-label="Saved cities">
         <div class="section-body">
+            {% if favorites %}
+            <div class="fav-head">
+                <h2 class="section-title">
+                    <span class="section-title-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                    </span>
+                    Saved locations
+                </h2>
+                <span class="fav-count">{{ favorites|length }} {% if favorites|length == 1 %}city{% else %}cities{% endif %}</span>
+            </div>
+            <div class="favorites-grid">
+            {% endif %}
             {% for favorite in favorites %}
                 <div class="favorite-card">
-                    <div>
+                    <span class="chip-city-icon fav-photo" data-city="{{ favorite.city|escape }}" data-country="{{ favorite.country|escape }}" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </span>
+
+                    <div class="favorite-info">
                         <h3>{{ favorite.city }}</h3>
                         {% if favorite.country %}
                             <p>{{ favorite.country }}</p>
@@ -61,6 +70,9 @@
                     </a>
                 </div>
             {% endfor %}
+            {% if favorites %}
+            </div>
+            {% endif %}
         </div>
     </section>
 
@@ -69,4 +81,8 @@
     </a>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/weatherlab-ui.js' %}"></script>
 {% endblock %}

@@ -11,7 +11,7 @@
     <!-- Google Fonts — Geist -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
@@ -23,13 +23,17 @@
     <!-- Header -->
     <header class="site-header">
         <div class="header-inner">
-            <a href="{% url 'home' %}" class="header-brand" aria-label="Weather Analysis home">
-                <!-- Weather icon SVG -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-                    <path d="M22 10a3 3 0 0 0-3-3h-2.207a5.502 5.502 0 0 0-10.702.5"/>
+            <a href="{% url 'home' %}" class="header-brand" aria-label="WeatherLab home">
+                <!-- Cloud + sun logo -->
+                <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 36" aria-hidden="true">
+                    <g stroke="#ffb703" stroke-width="2.4" stroke-linecap="round">
+                        <path d="M30 2v3M40 12h-3M37 5l-2 2M23 5l2 2"/>
+                    </g>
+                    <circle cx="30" cy="13" r="6.5" fill="#ffc933"/>
+                    <path d="M12 33a8 8 0 0 1-.8-15.96A10 10 0 0 1 30.4 19.5 6.7 6.7 0 0 1 30 33z" fill="#2aa1ff"/>
+                    <path d="M12 33a8 8 0 0 1-.8-15.96A10 10 0 0 1 24 15.5 9 9 0 0 0 14 28a7 7 0 0 0 2 5z" fill="#6cc3ff" opacity=".75"/>
                 </svg>
-                WeatherLab
+                <span class="brand-text">Weather<span class="brand-lab">Lab</span></span>
             </a>
 
             <!-- Mobile menu button -->
@@ -42,30 +46,50 @@
             </button>
 
             <nav class="header-nav" id="headerNav" aria-label="Main navigation">
-                <a href="{% url 'home' %}" class="nav-link">
+                <a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                         <polyline points="9,22 9,12 15,12 15,22"/>
                     </svg>
                     Dashboard
                 </a>
-                <a href="{% url 'weather_history' %}" class="nav-link">
+
+                {% if user.is_authenticated %}
+                    <a href="{% url 'favorites' %}" class="nav-link {% if request.resolver_match.url_name == 'favorites' %}active{% endif %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                        </svg>
+                        Favorites
+                    </a>
+                {% endif %}
+
+                <a href="{% url 'weather_history' %}" class="nav-link {% if request.resolver_match.url_name == 'weather_history' %}active{% endif %}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/>
                         <polyline points="12,6 12,12 16,14"/>
                     </svg>
-                    History
+                    Search History
                 </a>
 
                 {% if user.is_authenticated %}
+                    <span class="nav-user-info">
+                        <span class="nav-user-avatar" aria-hidden="true">{% if user.first_name and user.last_name %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% else %}{{ user.username|slice:":2"|upper }}{% endif %}</span>
+                        {{ user.get_full_name|default:user.username }}
+                        <svg class="nav-user-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
                     <form method="post" action="{% url 'logout' %}" class="nav-auth-form">
                         {% csrf_token %}
                         <button type="submit" class="nav-link nav-auth-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16,17 21,12 16,7"/>
+                                <line x1="21" x2="9" y1="12" y2="12"/>
+                            </svg>
                             Logout
                         </button>
                     </form>
                 {% else %}
-                    <a href="{% url 'login' %}" class="nav-link">
+                    <a href="{% url 'login' %}" class="nav-link nav-link--guest">
                         Login
                     </a>
                     <a href="{% url 'register' %}" class="nav-link">
@@ -78,6 +102,13 @@
     </header>
 
     <main id="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message" role="status" style="max-width: var(--dp-content-width); margin: 12px auto; padding: 14px var(--dp-page-pad);">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
         {% block content %}
         {% endblock %}
     </main>

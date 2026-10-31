@@ -12,7 +12,7 @@ class WeatherData(models.Model):
         blank=True,
     )
     city = models.CharField(max_length=100, db_index=True)
-    country = models.CharField(max_length=2)
+    country = models.CharField(max_length=2, db_index=True)
     temperature = models.FloatField()
     feels_like = models.FloatField()
     humidity = models.IntegerField()
@@ -20,10 +20,15 @@ class WeatherData(models.Model):
     description = models.CharField(max_length=255)
     wind_speed = models.FloatField()
     clouds = models.IntegerField()
+    icon = models.CharField(max_length=10, blank=True, default="")
     searched_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ["-searched_at"]
+        indexes = [
+            models.Index(fields=["user", "city"], name="weatherdata_user_city_idx"),
+            models.Index(fields=["user", "searched_at"], name="weatherdata_user_searched_idx"),
+        ]
 
     def __str__(self):
         return f"{self.city}, {self.country}"
@@ -35,12 +40,15 @@ class FavoriteCity(models.Model):
         on_delete=models.CASCADE,
         related_name="favorite_cities",
     )
-    city = models.CharField(max_length=100)
-    country = models.CharField(max_length=2, blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True)
+    city = models.CharField(max_length=100, db_index=True)
+    country = models.CharField(max_length=2, db_index=True, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ["city"]
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="favoritecity_user_created_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "city", "country"],
@@ -60,7 +68,7 @@ class City(models.Model):
     country = models.CharField(max_length=2, db_index=True)
     latitude = models.FloatField()
     longitude = models.FloatField()
-    population = models.IntegerField(default=0)
+    population = models.IntegerField(default=0, db_index=True)
 
     class Meta:
         indexes = [

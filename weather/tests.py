@@ -1,17 +1,41 @@
 import io
 import os
+import requests
 import secrets
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.contrib.auth import authenticate, get_user_model
 from django.core.management import call_command
+from django.core.cache import cache
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from weather.models import WeatherData, City
-from weather.services import analyze_weather_history, generate_weather_insights
+from weather.models import WeatherData, FavoriteCity, City
+from weather.services import (
+    analyze_weather_history,
+    generate_weather_insights,
+    get_weather_data,
+    MAX_RETRIES,
+    REQUEST_TIMEOUT,
+)
+from weather.utils import (
+    beaufort_scale,
+    celsius_to_fahrenheit,
+    celsius_to_kelvin,
+    categorize_weather_condition,
+    fahrenheit_to_celsius,
+    format_weather_datetime,
+    hpa_to_inhg,
+    humidity_comfort_level,
+    inhg_to_hpa,
+    kelvin_to_celsius,
+    kmh_to_mps,
+    mps_to_kmh,
+    mps_to_mph,
+    mph_to_mps,
+)
 from weather.management.commands.import_cities import Command
 
 
@@ -19,6 +43,7 @@ class WeatherChartTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     @patch('weather.views.get_weather_data')
     @patch('weather.views.get_forecast_data')
@@ -146,6 +171,7 @@ class WeatherInsightsTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     def _forecast(self, entries):
         return {"forecast": entries}
@@ -658,6 +684,22 @@ class WeatherHistoryViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "weather/history.html")
 
+    def test_history_context_includes_user_searches(self):
+        """Regression test for BUG-007: history queryset passed to template context."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('history', response.context)
+        history = response.context['history']
+        self.assertEqual(history.count(), 4)
+
+    def test_search_history_section_renders_user_records(self):
+        """Regression test for BUG-007: Search History section shows user's searches."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "London")
+        self.assertContains(response, "Paris")
+        self.assertNotContains(response, "No weather searches yet.")
+
     def test_named_url_resolves(self):
         self.assertEqual(reverse("weather_history"), "/history/")
 
@@ -893,6 +935,7 @@ class WeatherSearchOwnershipTests(TestCase):
             password="TestPassword123!",
         )
         self.client = Client()
+        cache.clear()
 
     @patch("weather.views.get_weather_data")
     def test_saved_search_is_associated_with_logged_in_user(
@@ -976,6 +1019,7 @@ class WeatherSearchExperienceTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     @patch('weather.views.get_weather_data')
     @patch('weather.views.get_forecast_data')
@@ -1065,6 +1109,39 @@ class CityModelTests(TestCase):
         cities = list(City.objects.all())
         self.assertEqual(cities[0].name, "Large")
         self.assertEqual(cities[1].name, "Small")
+
+    def test_city_population_has_db_index(self):
+        """TC-044: City population field has a database index."""
+        self.assertTrue(City._meta.get_field("population").db_index)
+
+
+class WeatherDataModelIndexTests(TestCase):
+    """TC-042: WeatherData model indexes for user-scoped history queries."""
+
+    def test_weatherdata_country_has_db_index(self):
+        self.assertTrue(WeatherData._meta.get_field("country").db_index)
+
+    def test_weatherdata_composite_indexes(self):
+        index_names = {index.name for index in WeatherData._meta.indexes}
+        self.assertIn("weatherdata_user_city_idx", index_names)
+        self.assertIn("weatherdata_user_searched_idx", index_names)
+
+
+class FavoriteCityModelIndexTests(TestCase):
+    """TC-043: FavoriteCity model indexes for user-scoped favorite queries."""
+
+    def test_favoritecity_city_has_db_index(self):
+        self.assertTrue(FavoriteCity._meta.get_field("city").db_index)
+
+    def test_favoritecity_country_has_db_index(self):
+        self.assertTrue(FavoriteCity._meta.get_field("country").db_index)
+
+    def test_favoritecity_created_at_has_db_index(self):
+        self.assertTrue(FavoriteCity._meta.get_field("created_at").db_index)
+
+    def test_favoritecity_composite_index(self):
+        index_names = {index.name for index in FavoriteCity._meta.indexes}
+        self.assertIn("favoritecity_user_created_idx", index_names)
 
 
 class CityAutocompleteTests(TestCase):
@@ -1279,6 +1356,7 @@ class WeatherEmptyStateTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('home')
+        cache.clear()
 
     def test_home_page_shows_empty_history_state(self):
         """TC-039: Home page shows empty state when there is no search history."""
@@ -1327,3 +1405,905 @@ class WeatherEmptyStateTests(TestCase):
         self.assertContains(response, "—°C")
         self.assertContains(response, "—%")
         self.assertContains(response, "— m/s")
+
+
+class WeatherApiServiceTests(TestCase):
+    """Tests for OpenWeatherMap service request handling (WT-053).
+
+    Covers retry behavior, timeout application, and normalized error responses.
+    """
+
+    def _mock_response(self, status_code=200, json_data=None):
+        response = Mock()
+        response.status_code = status_code
+        response.json.return_value = json_data or {}
+        response.raise_for_status = Mock()
+        return response
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_retries_on_timeout_then_succeeds(
+        self, mock_get, mock_sleep
+    ):
+        """TC-045: Transient timeouts are retried before returning data."""
+        mock_get.side_effect = [
+            requests.exceptions.Timeout(),
+            requests.exceptions.Timeout(),
+            self._mock_response(200, {"name": "London"}),
+        ]
+        result = get_weather_data("London")
+        self.assertEqual(result, {"name": "London"})
+        self.assertEqual(mock_get.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_returns_normalized_error_after_timeout_retries_exhausted(
+        self, mock_get, mock_sleep
+    ):
+        """TC-046: Timeout error is normalized after retries are exhausted."""
+        mock_get.side_effect = requests.exceptions.Timeout()
+        result = get_weather_data("London")
+        self.assertEqual(result, {"error": "Weather service request timed out."})
+        self.assertEqual(mock_get.call_count, MAX_RETRIES + 1)
+
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_applies_configured_timeout(self, mock_get):
+        """TC-047: The configured request timeout is passed to requests.get."""
+        mock_get.return_value = self._mock_response(200, {"name": "London"})
+        get_weather_data("London")
+        _, kwargs = mock_get.call_args
+        self.assertEqual(kwargs["timeout"], REQUEST_TIMEOUT)
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_retries_retryable_http_error_then_errors(
+        self, mock_get, mock_sleep
+    ):
+        """TC-048: Retryable HTTP 502 errors are retried then normalized to an error."""
+        def http_error_502():
+            exc = requests.exceptions.HTTPError()
+            response = Mock()
+            response.status_code = 502
+            exc.response = response
+            return exc
+
+        mock_get.side_effect = [http_error_502(), http_error_502(), http_error_502()]
+        result = get_weather_data("London")
+        self.assertEqual(result, {"error": "Weather service error (HTTP 502)."})
+        self.assertEqual(mock_get.call_count, MAX_RETRIES + 1)
+
+    @patch("weather.services.time.sleep")
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_non_retryable_http_error_returns_immediately(
+        self, mock_get, mock_sleep
+    ):
+        """TC-049: Non-retryable HTTP 401 returns immediately without retrying."""
+        def http_error_401():
+            exc = requests.exceptions.HTTPError()
+            response = Mock()
+            response.status_code = 401
+            exc.response = response
+            return exc
+
+        mock_get.side_effect = http_error_401()
+        result = get_weather_data("London")
+        self.assertEqual(result, {"error": "Weather service error (HTTP 401)."})
+        self.assertEqual(mock_get.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    @patch("weather.services.requests.get")
+    def test_get_weather_data_404_returns_city_not_found_without_retry(
+        self, mock_get
+    ):
+        """TC-050: HTTP 404 returns "City not found." without retrying."""
+        mock_get.return_value = self._mock_response(404)
+        result = get_weather_data("Nowhere")
+        self.assertEqual(result, {"error": "City not found."})
+        self.assertEqual(mock_get.call_count, 1)
+
+
+class WeatherUtilsTests(TestCase):
+    """Tests for weather utility functions (WT-054).
+
+    Covers temperature/wind/pressure conversion, weather condition
+    categorization, date formatting, Beaufort scale, and humidity comfort.
+    """
+
+    # --- Temperature conversion ---
+
+    def test_celsius_to_fahrenheit(self):
+        """TC-051: Celsius to Fahrenheit conversion."""
+        self.assertEqual(celsius_to_fahrenheit(0), 32.0)
+        self.assertEqual(celsius_to_fahrenheit(100), 212.0)
+
+    def test_fahrenheit_to_celsius(self):
+        """TC-052: Fahrenheit to Celsius conversion."""
+        self.assertEqual(fahrenheit_to_celsius(32), 0.0)
+        self.assertEqual(fahrenheit_to_celsius(212), 100.0)
+
+    def test_celsius_to_kelvin(self):
+        """TC-053: Celsius to Kelvin conversion."""
+        self.assertEqual(celsius_to_kelvin(0), 273.15)
+        self.assertEqual(celsius_to_kelvin(-273.15), 0.0)
+
+    def test_kelvin_to_celsius(self):
+        """TC-054: Kelvin to Celsius conversion."""
+        self.assertEqual(kelvin_to_celsius(273.15), 0.0)
+        self.assertEqual(kelvin_to_celsius(373.15), 100.0)
+
+    def test_temperature_conversion_none(self):
+        """TC-055: Temperature conversion returns None for None input."""
+        self.assertIsNone(celsius_to_fahrenheit(None))
+        self.assertIsNone(fahrenheit_to_celsius(None))
+        self.assertIsNone(celsius_to_kelvin(None))
+        self.assertIsNone(kelvin_to_celsius(None))
+
+    # --- Wind speed conversion ---
+
+    def test_mps_to_kmh(self):
+        """TC-056: Meters per second to kilometers per hour."""
+        self.assertEqual(mps_to_kmh(10), 36.0)
+
+    def test_mps_to_mph(self):
+        """TC-057: Meters per second to miles per hour."""
+        self.assertAlmostEqual(mps_to_mph(10), 22.3694, places=4)
+
+    def test_kmh_to_mps(self):
+        """TC-058: Kilometers per hour to meters per second."""
+        self.assertEqual(kmh_to_mps(36), 10.0)
+
+    def test_mph_to_mps(self):
+        """TC-059: Miles per hour to meters per second."""
+        self.assertAlmostEqual(mph_to_mps(22.3694), 10.0, places=4)
+
+    def test_wind_conversion_none(self):
+        """TC-060: Wind conversion returns None for None input."""
+        self.assertIsNone(mps_to_kmh(None))
+        self.assertIsNone(mps_to_mph(None))
+        self.assertIsNone(kmh_to_mps(None))
+        self.assertIsNone(mph_to_mps(None))
+
+    # --- Pressure conversion ---
+
+    def test_hpa_to_inhg(self):
+        """TC-061: Hectopascals to inches of mercury."""
+        self.assertAlmostEqual(hpa_to_inhg(1013.25), 29.92, places=2)
+
+    def test_inhg_to_hpa(self):
+        """TC-062: Inches of mercury to hectopascals."""
+        self.assertAlmostEqual(
+            inhg_to_hpa(hpa_to_inhg(1013.25)), 1013.25, places=2
+        )
+
+    def test_pressure_conversion_none(self):
+        """TC-063: Pressure conversion returns None for None input."""
+        self.assertIsNone(hpa_to_inhg(None))
+        self.assertIsNone(inhg_to_hpa(None))
+
+    # --- Weather condition categorization ---
+
+    def test_categorize_clear(self):
+        """TC-064: Clear sky categorizes as clear."""
+        self.assertEqual(categorize_weather_condition("clear sky", "01d"), "clear")
+
+    def test_categorize_cloudy(self):
+        """TC-065: Cloudy categorizes as cloudy."""
+        self.assertEqual(categorize_weather_condition("overcast clouds", "04d"), "cloudy")
+
+    def test_categorize_rain(self):
+        """TC-066: Rain categorizes as rain."""
+        self.assertEqual(categorize_weather_condition("moderate rain", "10d"), "rain")
+
+    def test_categorize_thunderstorm(self):
+        """TC-067: Thunderstorm categorizes as thunderstorm."""
+        self.assertEqual(categorize_weather_condition("thunderstorm", "11d"), "thunderstorm")
+
+    def test_categorize_snow(self):
+        """TC-068: Snow categorizes as snow."""
+        self.assertEqual(categorize_weather_condition("snow", "13n"), "snow")
+
+    def test_categorize_mist(self):
+        """TC-069: Mist categorizes as mist."""
+        self.assertEqual(categorize_weather_condition("mist", "50d"), "mist")
+
+    def test_categorize_unknown(self):
+        """TC-070: Unknown input categorizes as unknown."""
+        self.assertEqual(categorize_weather_condition("", ""), "unknown")
+        self.assertEqual(categorize_weather_condition(None, None), "unknown")
+
+    # --- Date formatting ---
+
+    def test_format_weather_datetime(self):
+        """TC-071: Datetime string formats for display."""
+        self.assertEqual(
+            format_weather_datetime("2021-01-07 12:00:00"),
+            "Jan 07, 12:00 PM",
+        )
+
+    def test_format_weather_datetime_invalid(self):
+        """TC-072: Invalid datetime returns Time unavailable."""
+        self.assertEqual(format_weather_datetime("not-a-date"), "Time unavailable")
+
+    def test_format_weather_datetime_none(self):
+        """TC-073: None datetime returns Time unavailable."""
+        self.assertEqual(format_weather_datetime(None), "Time unavailable")
+
+    # --- Beaufort scale ---
+
+    def test_beaufort_calm(self):
+        """TC-074: Zero wind speed is Calm."""
+        self.assertEqual(
+            beaufort_scale(0), (0, "Calm", "Calm; smoke rises vertically")
+        )
+
+    def test_beaufort_fresh_breeze(self):
+        """TC-075: 10 m/s is Fresh breeze."""
+        self.assertEqual(beaufort_scale(10)[0], 5)
+        self.assertEqual(beaufort_scale(10)[1], "Fresh breeze")
+
+    def test_beaufort_none(self):
+        """TC-076: None wind speed returns (None, None, None)."""
+        self.assertEqual(beaufort_scale(None), (None, None, None))
+
+    def test_beaufort_negative(self):
+        """TC-077: Negative wind speed returns (None, None, None)."""
+        self.assertEqual(beaufort_scale(-5), (None, None, None))
+
+    # --- Humidity comfort ---
+
+    def test_humidity_low(self):
+        """TC-078: Low humidity returns Low."""
+        self.assertEqual(humidity_comfort_level(20), "Low")
+
+    def test_humidity_comfortable(self):
+        """TC-079: Comfortable humidity returns Comfortable."""
+        self.assertEqual(humidity_comfort_level(50), "Comfortable")
+
+    def test_humidity_high(self):
+        """TC-080: High humidity returns High."""
+        self.assertEqual(humidity_comfort_level(80), "High")
+
+    def test_humidity_none(self):
+        """TC-081: None humidity returns Data unavailable."""
+        self.assertEqual(humidity_comfort_level(None), "Data unavailable")
+
+    def test_humidity_boolean(self):
+        """TC-082: Boolean humidity returns Data unavailable."""
+        self.assertEqual(humidity_comfort_level(True), "Data unavailable")
+
+
+class ErrorPageTests(TestCase):
+    """Tests for custom user-friendly error pages (WT-055).
+
+    Covers 400, 403, 404, and 500 error pages: status codes, templates,
+    rendered content, URL route accessibility, and handler wiring.
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+    # --- 404 Page Not Found ---
+
+    def test_404_page_returns_status_and_template(self):
+        """TC-083: 404 page returns 404 status and uses 404 template."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "weather/404.html")
+
+    def test_404_page_displays_message(self):
+        """TC-084: 404 page contains the expected heading and message."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertContains(response, "Page Not Found", status_code=404)
+        self.assertContains(
+            response,
+            "The page you're looking for doesn't exist.",
+            status_code=404,
+        )
+        self.assertContains(response, "Return Home", status_code=404)
+
+    def test_404_page_home_link_resolves(self):
+        """TC-085: 404 page Return Home link points to home URL."""
+        response = self.client.get(reverse("page_not_found"))
+        self.assertContains(response, reverse("home"), status_code=404)
+
+    # --- 500 Server Error ---
+
+    def test_500_page_returns_status_and_template(self):
+        """TC-086: 500 page returns 500 status and uses 500 template."""
+        response = self.client.get(reverse("server_error"))
+        self.assertEqual(response.status_code, 500)
+        self.assertTemplateUsed(response, "weather/500.html")
+
+    def test_500_page_displays_message(self):
+        """TC-087: 500 page contains the expected heading and message."""
+        response = self.client.get(reverse("server_error"))
+        self.assertContains(response, "Server Error", status_code=500)
+        self.assertContains(
+            response, "Something went wrong on our end.", status_code=500
+        )
+        self.assertContains(response, "Return Home", status_code=500)
+
+    # --- 403 Permission Denied ---
+
+    def test_403_page_returns_status_and_template(self):
+        """TC-088: 403 page returns 403 status and uses 403 template."""
+        response = self.client.get(reverse("permission_denied"))
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "weather/403.html")
+
+    def test_403_page_displays_message(self):
+        """TC-089: 403 page contains the expected heading and message."""
+        response = self.client.get(reverse("permission_denied"))
+        self.assertContains(response, "Permission Denied", status_code=403)
+        self.assertContains(
+            response, "You don't have permission to view this page.", status_code=403
+        )
+        self.assertContains(response, "Return Home", status_code=403)
+
+    # --- 400 Bad Request ---
+
+    def test_400_page_returns_status_and_template(self):
+        """TC-090: 400 page returns 400 status and uses 400 template."""
+        response = self.client.get(reverse("bad_request"))
+        self.assertEqual(response.status_code, 400)
+        self.assertTemplateUsed(response, "weather/400.html")
+
+    def test_400_page_displays_message(self):
+        """TC-091: 400 page contains the expected heading and message."""
+        response = self.client.get(reverse("bad_request"))
+        self.assertContains(response, "Bad Request", status_code=400)
+        self.assertContains(
+            response,
+            "The request couldn't be understood by the server.",
+            status_code=400,
+        )
+        self.assertContains(response, "Return Home", status_code=400)
+
+    # --- Error handlers wired in config ---
+
+    def test_error_handlers_point_to_views(self):
+        """TC-092: Django error handlers reference the correct views."""
+        import config.urls as urlconf
+
+        self.assertEqual(urlconf.handler404, "weather.views.page_not_found")
+        self.assertEqual(urlconf.handler500, "weather.views.server_error")
+        self.assertEqual(
+            urlconf.handler403, "weather.views.permission_denied"
+        )
+        self.assertEqual(urlconf.handler400, "weather.views.bad_request")
+
+
+class FavoriteCityRedirectTests(TestCase):
+    """Regression test for Bug 1: add_favorite_city must preserve weather data.
+
+    Previously the view redirected to plain ``home`` without the ``?city=``
+    query parameter, so the home view skipped the weather API fetch and the
+    weather data vanished after adding a favorite.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="fav_redirect_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("add_favorite_city")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_redirects_home_with_city_param(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-093: Adding a favorite redirects to home with ?city= so weather persists."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        response = self.client.post(self.url, {"city": "London", "country": "GB"})
+        self.assertRedirects(response, reverse("home") + "?city=London")
+
+
+class RecentSearchDedupTests(TestCase):
+    """Regression test for Bug 2: recent searches must not show duplicate cities.
+
+    Previously ``latest_searches = history[:10`` returned every
+    WeatherData record, so the same city searched multiple times appeared
+    repeatedly. Recent searches are now deduplicated by city
+    (case-insensitive), keeping the most recent record per city.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="dedup_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+
+        self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
+        self.t2 = timezone.make_aware(datetime(2026, 1, 15, 11, 0, 0))
+        self.t3 = timezone.make_aware(datetime(2026, 1, 15, 12, 0, 0))
+        self.t4 = timezone.make_aware(datetime(2026, 1, 15, 13, 0, 0))
+
+        r1 = WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=15.0, feels_like=14.0,
+            humidity=60, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20,
+        )
+        r2 = WeatherData.objects.create(
+            user=self.user,
+            city="london", country="GB", temperature=16.0, feels_like=15.0,
+            humidity=55, pressure=1013, description="partly cloudy",
+            wind_speed=4.0, clouds=40,
+        )
+        r3 = WeatherData.objects.create(
+            user=self.user,
+            city="LONDON", country="GB", temperature=17.0, feels_like=16.0,
+            humidity=50, pressure=1010, description="rain",
+            wind_speed=5.0, clouds=90,
+        )
+        r4 = WeatherData.objects.create(
+            user=self.user,
+            city="Paris", country="FR", temperature=20.0, feels_like=19.0,
+            humidity=70, pressure=1020, description="snow",
+            wind_speed=2.0, clouds=100,
+        )
+
+        WeatherData.objects.filter(pk=r1.pk).update(searched_at=self.t1)
+        WeatherData.objects.filter(pk=r2.pk).update(searched_at=self.t2)
+        WeatherData.objects.filter(pk=r3.pk).update(searched_at=self.t3)
+        WeatherData.objects.filter(pk=r4.pk).update(searched_at=self.t4)
+
+    def test_latest_searches_deduplicated_by_city_case_insensitive(
+        self,
+    ):
+        """TC-094: Recent searches deduplicate by city (case-insensitive), most recent kept."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        latest = list(response.context["latest_searches"])
+        # 4 records but only 2 unique cities (London/LONDON/london collapse to one)
+        self.assertEqual(len(latest), 2)
+        city_names_lower = [r.city.lower() for r in latest]
+        self.assertEqual(city_names_lower.count("london"), 1)
+        self.assertEqual(city_names_lower.count("paris"), 1)
+        # Ordering is -searched_at: Paris (t4) most recent, then LONDON (t3)
+        self.assertEqual(latest[0].city, "Paris")
+        self.assertEqual(latest[1].city, "LONDON")
+
+
+class FavoriteMessageTests(TestCase):
+    """Regression test for BUG-006: notification shown after adding favorite city.
+
+    Previously add_favorite_city set Django messages but base.html did not
+    render them, so users saw no confirmation after adding a favorite.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="fav_msg_user", password="testpass123"
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("add_favorite_city")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_shows_success_message(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-095: Adding a favorite shows a success flash message."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        response = self.client.post(
+            self.url,
+            {"city": "London", "country": "GB"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "London added to your favorites.")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_add_favorite_already_exists_shows_info_message(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-096: Adding an already-favorited city shows an info flash message."""
+        mock_get_weather.return_value = {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 15.0,
+                "feels_like": 14.0,
+                "humidity": 60,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+        mock_get_forecast.return_value = {
+            "list": [],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+        # First add
+        self.client.post(
+            self.url,
+            {"city": "London", "country": "GB"},
+            follow=True,
+        )
+        # Second add - should show "already in favorites" message
+        response = self.client.post(
+            self.url,
+            {"city": "London", "country": "GB"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "London is already in your favorites.")
+
+
+class DatabaseQueryOptimizationTests(TestCase):
+    """Regression guards for query optimizations (WT-056).
+
+    Verifies that optimized code paths use the expected number of queries
+    and that dead code paths (unused context keys) were removed.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="opt_user", password="testpass123"
+        )
+        self.t1 = timezone.make_aware(datetime(2026, 1, 15, 10, 0, 0))
+        self.t2 = timezone.make_aware(datetime(2026, 1, 15, 14, 0, 0))
+
+        WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=10.0, feels_like=9.0,
+            humidity=60, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20,
+        )
+        WeatherData.objects.create(
+            user=self.user,
+            city="Paris", country="FR", temperature=5.0, feels_like=4.0,
+            humidity=70, pressure=1020, description="snow",
+            wind_speed=2.0, clouds=100,
+        )
+        WeatherData.objects.filter(pk=1).update(searched_at=self.t1)
+        WeatherData.objects.filter(pk=2).update(searched_at=self.t2)
+
+    def test_analyze_weather_history_single_query(self):
+        """TC-097: analyze_weather_history evaluates the queryset once (one query)."""
+        with self.assertNumQueries(1):
+            result = analyze_weather_history(user=self.user)
+        self.assertEqual(result["record_count"], 2)
+        self.assertEqual(result["min_temperature"], 5.0)
+        self.assertEqual(result["max_temperature"], 10.0)
+        self.assertEqual(result["avg_temperature"], 7.5)
+
+    def test_home_view_excludes_removed_city_weather(self):
+        """TC-098: home view context no longer includes dead city_weather key."""
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("city_weather", response.context)
+
+    def test_home_view_excludes_removed_favorites(self):
+        """TC-099: home view context no longer includes unused favorites key."""
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("favorites", response.context)
+
+
+class WeatherCacheTests(TestCase):
+    """Regression tests for API request caching (WT-057).
+
+    Verifies that the home view reuses a recent WeatherData record
+    (within the cache TTL) instead of calling the OpenWeatherMap API,
+    and falls back to the API when the cache is empty or expired.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="cache_user", password="testpass123"
+        )
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+        self.t_recent = timezone.now() - timedelta(minutes=5)
+        self.t_expired = timezone.now() - timedelta(hours=2)
+        cache.clear()
+
+    def _weather_payload(self):
+        return {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 20.0,
+                "feels_like": 19.5,
+                "humidity": 50,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+
+    def _forecast_payload(self):
+        return {
+            "list": [
+                {
+                    "dt": 1610000000,
+                    "dt_txt": "2021-01-07 12:00:00",
+                    "main": {
+                        "temp": 22.0,
+                        "feels_like": 21.5,
+                        "humidity": 60,
+                    },
+                    "weather": [{"description": "clear sky", "icon": "01d"}],
+                    "wind": {"speed": 3.0},
+                    "clouds": {"all": 20},
+                }
+            ],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_cache_hit_skips_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-100: A recent cached record skips the OpenWeatherMap weather API call."""
+        WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=20.0, feels_like=19.5,
+            humidity=50, pressure=1015, description="clear sky",
+            wind_speed=3.5, clouds=20, icon="01d",
+        )
+        WeatherData.objects.filter(city__iexact="London").update(searched_at=self.t_recent)
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API must NOT be called on a cache hit.
+        mock_get_weather.assert_not_called()
+        # Forecast API is still called.
+        mock_get_forecast.assert_called_once()
+        weather = response.context["weather"]
+        self.assertEqual(weather["city"], "London")
+        self.assertEqual(weather["temperature"], 20.0)
+        self.assertEqual(weather["icon"], "01d")
+        self.assertIsNone(response.context["error"])
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_cache_miss_calls_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-101: No cached record triggers the OpenWeatherMap weather API call."""
+        mock_get_weather.return_value = self._weather_payload()
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with("London")
+        mock_get_forecast.assert_called_once()
+        # A new WeatherData record should have been saved.
+        self.assertTrue(
+            WeatherData.objects.filter(user=self.user, city__iexact="London").exists()
+        )
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_expired_cache_calls_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-102: An expired cached record (older than TTL) triggers the API."""
+        WeatherData.objects.create(
+            user=self.user,
+            city="London", country="GB", temperature=10.0, feels_like=9.0,
+            humidity=60, pressure=1010, description="rain",
+            wind_speed=5.0, clouds=90, icon="10d",
+        )
+        WeatherData.objects.filter(city__iexact="London").update(searched_at=self.t_expired)
+        mock_get_weather.return_value = self._weather_payload()
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        mock_get_weather.assert_called_once_with("London")
+        # A fresh record should have been saved (cache was expired).
+        self.assertEqual(
+            WeatherData.objects.filter(user=self.user, city__iexact="London").count(), 2
+        )
+
+
+class WeatherDjangoCacheTests(TestCase):
+    """Regression tests for Django framework caching (WT-058).
+
+    Verifies that the home view uses Django's cache framework (L1) for
+    current weather and forecast data, reducing OpenWeatherMap API calls,
+    complementing WT-057's model-based current-weather cache (L2).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username="django_cache_user", password="testpass123"
+        )
+        self.client.force_login(self.user)
+        self.url = reverse("home")
+        cache.clear()
+
+    def _weather_payload(self):
+        return {
+            "weather": [{"description": "clear sky", "icon": "01d"}],
+            "main": {
+                "temp": 20.0,
+                "feels_like": 19.5,
+                "humidity": 50,
+                "pressure": 1015,
+            },
+            "wind": {"speed": 3.5},
+            "clouds": {"all": 20},
+            "name": "London",
+            "sys": {"country": "GB"},
+        }
+
+    def _forecast_payload(self):
+        return {
+            "list": [
+                {
+                    "dt": 1610000000,
+                    "dt_txt": "2021-01-07 12:00:00",
+                    "main": {
+                        "temp": 22.0,
+                        "feels_like": 21.5,
+                        "humidity": 60,
+                    },
+                    "weather": [{"description": "clear sky", "icon": "01d"}],
+                    "wind": {"speed": 3.0},
+                    "clouds": {"all": 20},
+                }
+            ],
+            "city": {"name": "London", "country": "GB"},
+        }
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_django_cache_hit_skips_weather_api(self, mock_get_forecast, mock_get_weather):
+        """TC-103: Django cache hit for current weather skips the weather API call."""
+        from weather.services import set_cached_weather_django
+
+        cached = {
+            "city": "London",
+            "country": "GB",
+            "temperature": 20.0,
+            "feels_like": 19.5,
+            "humidity": 50,
+            "pressure": 1015,
+            "description": "clear sky",
+            "wind_speed": 3.5,
+            "clouds": 20,
+            "icon": "01d",
+        }
+        set_cached_weather_django("London", cached, self.user)
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API must NOT be called on a Django cache hit.
+        mock_get_weather.assert_not_called()
+        # Forecast API is still called (forecast not cached).
+        mock_get_forecast.assert_called_once()
+        weather = response.context["weather"]
+        self.assertEqual(weather["city"], "London")
+        self.assertEqual(weather["temperature"], 20.0)
+        self.assertIsNone(response.context["error"])
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_django_forecast_cache_hit_skips_forecast_api(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-104: Django cache hit for forecast skips the forecast API call."""
+        from weather.services import set_cached_forecast_django
+
+        cached_forecast = {
+            "city": "London",
+            "country": "GB",
+            "forecast": [
+                {
+                    "datetime": "2021-01-07 12:00:00",
+                    "temperature": 22.0,
+                    "feels_like": 21.5,
+                    "humidity": 60,
+                    "description": "clear sky",
+                    "icon": "01d",
+                    "wind_speed": 3.0,
+                    "clouds": 20,
+                }
+            ],
+        }
+        set_cached_forecast_django("London", cached_forecast)
+        mock_get_weather.return_value = self._weather_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API is called (current weather not cached).
+        mock_get_weather.assert_called_once_with("London")
+        # Forecast API must NOT be called on a Django cache hit.
+        mock_get_forecast.assert_not_called()
+        forecast = response.context["forecast"]
+        self.assertIsNotNone(forecast)
+        self.assertEqual(forecast["city"], "London")
+
+    @patch("weather.views.get_weather_data")
+    @patch("weather.views.get_forecast_data")
+    def test_django_cache_miss_uses_model_cache(
+        self, mock_get_forecast, mock_get_weather
+    ):
+        """TC-105: Django cache miss falls through to model cache (no API call)."""
+        from weather.services import get_cached_weather_django
+
+        # Django cache is empty (cleared in setUp).
+        # Model cache has a recent record for London.
+        WeatherData.objects.create(
+            user=self.user,
+            city="London",
+            country="GB",
+            temperature=18.0,
+            feels_like=17.5,
+            humidity=55,
+            pressure=1012,
+            description="partly cloudy",
+            wind_speed=4.0,
+            clouds=40,
+            icon="02d",
+        )
+        WeatherData.objects.filter(city__iexact="London").update(
+            searched_at=timezone.now() - timedelta(minutes=5)
+        )
+        mock_get_forecast.return_value = self._forecast_payload()
+
+        response = self.client.get(self.url, {"city": "London"})
+        self.assertEqual(response.status_code, 200)
+        # Weather API must NOT be called; model cache (L2) is used instead.
+        mock_get_weather.assert_not_called()
+        # Forecast API is still called.
+        mock_get_forecast.assert_called_once()
+        weather = response.context["weather"]
+        self.assertEqual(weather["city"], "London")
+        self.assertEqual(weather["temperature"], 18.0)
+        # Django cache should now be populated from the model cache hit.
+        self.assertIsNotNone(get_cached_weather_django("London", self.user))

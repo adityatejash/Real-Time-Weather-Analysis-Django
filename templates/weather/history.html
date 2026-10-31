@@ -6,7 +6,7 @@ Weather History — WeatherLab
 
 {% block content %}
 
-<div class="dashboard">
+<div class="dashboard dashboard--page">
 
     <!-- Hero Header -->
     <section class="section" aria-labelledby="history-heading">
@@ -19,7 +19,7 @@ Weather History — WeatherLab
     <!-- Filter Form -->
     <section class="section panel" aria-label="History filters">
         <div class="section-body">
-            <form method="get" class="search-form" id="historyFilterForm">
+            <form method="get" class="filter-form" id="historyFilterForm">
                 <p>
                     <label for="id_city">City</label>
                     <input
@@ -51,8 +51,8 @@ Weather History — WeatherLab
                 <button type="submit" class="btn btn--primary" id="filterButton">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
+                        width="18"
+                        height="18"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -61,8 +61,7 @@ Weather History — WeatherLab
                         stroke-linejoin="round"
                         aria-hidden="true"
                     >
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
                     </svg>
                     Filter
                 </button>
@@ -226,6 +225,51 @@ Weather History — WeatherLab
         </div>
     </section>
     {% endif %}
+
+    <!-- Search History (moved here from the dashboard) -->
+    <section class="section panel" aria-labelledby="search-history-heading">
+        <div class="section-body">
+            <h2 id="search-history-heading" class="section-title">
+                <span class="section-title-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                </span>
+                Search History
+            </h2>
+            {% if history %}
+                <div class="history-grid">
+                    {% for item in history %}
+                        <a class="history-card" href="{% url 'home' %}?city={{ item.city|urlencode }}">
+                            <div class="history-card-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                                </svg>
+                            </div>
+                            <div class="history-card-body">
+                                <div class="history-card-city">{{ item.city }}, {{ item.country }}</div>
+                                <div class="history-card-detail">
+                                    {{ item.description|title }} &middot; Humidity {{ item.humidity }}% &middot; Wind {{ item.wind_speed }} m/s
+                                </div>
+                            </div>
+                            <div class="history-card-meta">
+                                <div class="history-card-temp">{{ item.temperature }}°C</div>
+                                <div class="history-card-time">{{ item.searched_at|date:"M d, H:i" }}</div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                    <p>No weather searches yet.</p>
+                    <a href="{% url 'home' %}" class="btn btn--primary">Search for a City</a>
+                </div>
+            {% endif %}
+        </div>
+    </section>
 
 </div>
 

@@ -7,10 +7,12 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.views.decorators.http import require_POST
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
+from urllib.parse import urlencode
 
 from .forms import CitySearchForm, RegistrationForm
-from .models import WeatherData, FavoriteCity, City
+from .models import FavoriteCity, City
 
 from .services import (
     get_weather_data,
@@ -21,6 +23,15 @@ from .services import (
     calculate_forecast_statistics,
     generate_weather_insights,
     analyze_weather_history,
+    save_weather_search,
+    prepare_forecast_chart_data,
+    prepare_humidity_chart_data,
+    get_user_weather_history,
+    get_cached_weather_data,
+    get_cached_weather_django,
+    set_cached_weather_django,
+    get_cached_forecast_django,
+    set_cached_forecast_django,
 )
 
 
@@ -40,35 +51,44 @@ def home(request):
 
         if form.is_valid():
             city = form.cleaned_data["city"]
+            user = request.user if request.user.is_authenticated else None
 
-            data = get_weather_data(city)
-
-            if "error" in data:
-                error = data["error"]
+            # Check Django cache (L1) first, then model cache (L2), then API (L3).
+            cached_weather = get_cached_weather_django(city, user)
+            if cached_weather is None:
+                cached_weather = get_cached_weather_data(city, user)
+                if cached_weather is not None:
+                    set_cached_weather_django(city, cached_weather, user)
+            if cached_weather:
+                weather = cached_weather
             else:
-                weather = parse_weather_data(data)
+                data = get_weather_data(city)
 
-                WeatherData.objects.create(
-                    user=request.user if request.user.is_authenticated else None,
-                    city=weather["city"],
-                    country=weather["country"],
-                    temperature=weather["temperature"],
-                    feels_like=weather["feels_like"],
-                    humidity=weather["humidity"],
-                    pressure=weather["pressure"],
-                    description=weather["description"],
-                    wind_speed=weather["wind_speed"],
-                    clouds=weather["clouds"],
-                )
-
-                forecast_data = get_forecast_data(city)
-
-                if "error" in forecast_data:
-                    forecast_error = forecast_data["error"]
-                    insights = generate_weather_insights(weather, {})
+                if "error" in data:
+                    error = data["error"]
                 else:
-                    parsed_forecast = parse_forecast_data(forecast_data)
+                    weather = parse_weather_data(data)
+                    save_weather_search(user=user, weather_data=weather)
+                    set_cached_weather_django(city, weather, user)
 
+            if weather is not None:
+                # Check Django cache for forecast data before calling API.
+                cached_forecast = get_cached_forecast_django(city)
+                if cached_forecast is not None:
+                    parsed_forecast = cached_forecast
+                    forecast_error = None
+                else:
+                    forecast_data = get_forecast_data(city)
+
+                    if "error" in forecast_data:
+                        forecast_error = forecast_data["error"]
+                        insights = generate_weather_insights(weather, {})
+                        parsed_forecast = None
+                    else:
+                        parsed_forecast = parse_forecast_data(forecast_data)
+                        set_cached_forecast_django(city, parsed_forecast)
+
+                if parsed_forecast:
                     statistics = calculate_forecast_statistics(
                         parsed_forecast
                     )
@@ -83,46 +103,31 @@ def home(request):
                             parsed_forecast
                         ),
                     }
-                    forecast_chart = {
-                        "labels": [
-                            entry["datetime"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                        "temperatures": [
-                            entry["temperature"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                    }
-                    humidity_chart = {
-                        "labels": [
-                            entry["datetime"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                        "humidities": [
-                            entry["humidity"]
-                            for entry in parsed_forecast["forecast"]
-                        ],
-                    }
+                    forecast_chart = prepare_forecast_chart_data(
+                        parsed_forecast
+                    )
+                    humidity_chart = prepare_humidity_chart_data(
+                        parsed_forecast
+                    )
 
+    history = get_user_weather_history(request.user)
 
-    if request.user.is_authenticated:
-        history = WeatherData.objects.filter(user=request.user)
-        favorites = FavoriteCity.objects.filter(
-            user=request.user
-        ).order_by("city")
-    else:
-        history = WeatherData.objects.none()
-        favorites = FavoriteCity.objects.none()
-
-
-    latest_searches = history[:10]
-    city_weather = None
-    searched_city = request.GET.get("city")
-
-    if searched_city and request.user.is_authenticated:
-        city_weather = history.filter(
-            city__iexact=searched_city
-        )
+    # Recent searches: distinct cities (case-insensitive), most recent first,
+    # capped at 10. Loads only the fields needed and stops once 10 unique
+    # cities are collected, instead of materializing the whole history.
+    seen_cities = set()
+    latest_searches = []
+    for record in (
+        get_user_weather_history(request.user)
+        .order_by("-searched_at", "-pk")
+        .only("city", "searched_at")
+    ):
+        key = record.city.lower()
+        if key not in seen_cities:
+            seen_cities.add(key)
+            latest_searches.append(record)
+        if len(latest_searches) >= 10:
+            break
 
     return render(
         request,
@@ -133,14 +138,12 @@ def home(request):
             "error": error,
             "history": history,
             "latest_searches": latest_searches,
-            "city_weather": city_weather,
             "forecast": forecast,
             "forecast_chart": forecast_chart,
             "humidity_chart": humidity_chart,
             "forecast_error": forecast_error,
             "statistics": statistics,
             "insights": insights,
-            "favorites": favorites,
         },
     )
 
@@ -246,6 +249,8 @@ def history_view(request):
             user=request.user,
         )
 
+    history = get_user_weather_history(request.user)
+
     return render(
         request,
         "weather/history.html",
@@ -255,6 +260,7 @@ def history_view(request):
             "end_date": end_date_str,
             "result": result,
             "validation_error": validation_error,
+            "history": history,
         },
     )
 
@@ -362,7 +368,7 @@ def add_favorite_city(request):
     else:
         messages.info(request, f"{city} is already in your favorites.")
 
-    return redirect("home")
+    return redirect(f"{reverse('home')}?{urlencode({'city': city})}")
 
 @login_required(login_url="login")
 @require_POST
@@ -382,3 +388,23 @@ def remove_favorite_city(request, favorite_id):
     )
 
     return redirect("favorites")
+
+
+def page_not_found(request, exception=None):
+    """Render a user-friendly 404 page when a URL is not found."""
+    return render(request, "weather/404.html", status=404)
+
+
+def server_error(request):
+    """Render a user-friendly 500 page when a server error occurs."""
+    return render(request, "weather/500.html", status=500)
+
+
+def permission_denied(request, exception=None):
+    """Render a user-friendly 403 page when access is forbidden."""
+    return render(request, "weather/403.html", status=403)
+
+
+def bad_request(request, exception=None):
+    """Render a user-friendly 400 page when the request is malformed."""
+    return render(request, "weather/400.html", status=400)
