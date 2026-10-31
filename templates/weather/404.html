@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}
+Page Not Found — WeatherLab
+{% endblock %}
+
+{% block content %}
+<section class="section bg-[#0f2a4d]/60 backdrop-blur-sm border border-slate-800 rounded-panel" aria-label="Page not found">
+    <div class="section-body p-6 sm:p-8">
+        <div class="section-head flex flex-col items-center text-center gap-3 mb-6">
+            <h1 class="section-title text-lg font-semibold text-white">Page Not Found</h1>
+            <p class="section-subtitle text-slate-400">The page you're looking for doesn't exist.</p>
+        </div>
+        <div class="p-3 rounded-md border border-red-500/30 bg-red-500/10 text-red-400 text-sm mb-6" role="alert">
+            <p>Check the web address, or return to the dashboard to search for a city.</p>
+        </div>
+        <a href="{% url 'home' %}" class="btn btn--primary bg-white text-[#07142b] hover:bg-slate-200 px-6 py-2.5 transition-colors text-sm font-medium inline-flex items-center justify-center gap-2">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Return Home
+        </a>
+    </div>
+</section>
+{% endblock %}
