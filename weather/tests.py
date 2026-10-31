@@ -684,6 +684,22 @@ class WeatherHistoryViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "weather/history.html")
 
+    def test_history_context_includes_user_searches(self):
+        """Regression test for BUG-007: history queryset passed to template context."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('history', response.context)
+        history = response.context['history']
+        self.assertEqual(history.count(), 4)
+
+    def test_search_history_section_renders_user_records(self):
+        """Regression test for BUG-007: Search History section shows user's searches."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "London")
+        self.assertContains(response, "Paris")
+        self.assertNotContains(response, "No weather searches yet.")
+
     def test_named_url_resolves(self):
         self.assertEqual(reverse("weather_history"), "/history/")
 
